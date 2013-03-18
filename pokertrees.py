@@ -1,8 +1,21 @@
 from itertools import combinations
+from itertools import permutations
 from collections import Counter
 import random
 
 CHANCE_PLAYER = -1
+
+def overlap(t1, t2):
+    for x in t1:
+        if x in t2:
+            return True
+    return False
+
+def all_unique(hc):
+    for i in range(len(hc)-1):
+        if overlap(hc[i], hc[i+1:]):
+            return False
+    return True
 
 class GameTree(object):
     def __init__(self, players, deck, holecards, rounds, ante, blinds, history_format = '{holecards}:{boardcards}:{bets}'):
@@ -12,6 +25,9 @@ class GameTree(object):
         assert(deck != None)
         assert(len(rounds) > 0)
         assert(len(deck) > 1)
+        if blinds != None:
+            if type(blinds) is int or type(blinds) is float:
+                blinds = [blinds]
         self.players = players
         self.deck = deck
         self.holecards = holecards
@@ -21,9 +37,24 @@ class GameTree(object):
         self.history_format = history_format
 
     def build(self):
-        hc = self.holecard_distributions()
-        pot = self.ante * self.players
-        self.root = ChanceNode(None, hc)
+        # Collect antes
+        committed = [self.ante] * self.players
+        self.next_player = 0
+        # Collect blinds
+        if self.blinds != None:
+            for blind in blinds:
+                committed[self.next_player] += blind
+                self.next_player = (self.next_player + 1) % self.players
+        hc = [[]] * self.players
+        board = []
+        self.root = HolecardChanceNode(None, committed, hc, board, deck)
+        # Deal holecards
+        all_hc = self.holecard_distributions()
+        
+
+    def deal_holecards(self):
+        a = combinations(self.deck, self.holecards)
+        return filter(lambda x: all_unique(x), permutations(a, self.players))
 
     def holecard_distributions(self):
         x = Counter(combinations(self.deck, self.holecards))
@@ -37,7 +68,11 @@ class RoundInfo(object):
         self.maxbets = maxbets
 
 class Node(object):
-    def __init__(self, parent):
+    def __init__(self, parent, committed, holecards, board, deck):
+        self.committed = deepcopy(committed)
+        self.holecards = deepcopy(holecards)
+        self.board = deepcopy(board)
+        self.deck = deepcopy(deck)
         if parent:
             self.parent = parent
             self.parent.add_child(self)
@@ -62,27 +97,26 @@ class Node(object):
             self.children.append(child)
 
 class TerminalNode(Node):
-    def __init__(self, parent, payoffs):
-        Node.__init__(self, parent)
+    def __init__(self, parent, committed, holecards, board, deck, payoffs):
+        Node.__init__(self, parent, committed, holecards, board, deck)
         self.payoffs = payoffs
 
 class HolecardChanceNode(Node):
     def __init__(self, parent, committed, holecards, board, deck, player, todeal):
-        Node.__init__(self, parent)
-        self.committed = deepcopy(committed)
-        self.holecards = deepcopy(holecards)
-        self.board = deepcopy(board)
-        self.deck = deepcopy(deck)
+        Node.__init__(self, parent, committed, holecards, board, deck)
         self.player = player
+        self.todeal = todeal
         self.children = []
+
+class BoardcardChanceNode(Node):
+    def __init__(self, parent, committed, holecards, board, deck, todeal):
+        Node.__init__(self, parent, committed, holecards, board, deck)
+        self.todeal = todeal
+        self.children = []        
 
 class ActionNode(Node):
     def __init__(self, parent, committed, holecards, board, deck, player, roundinfo):
-        Node.__init__(self, parent)
-        self.committed = deepcopy(committed)
-        self.holecards = deepcopy(holecards)
-        self.board = deepcopy(board)
-        self.deck = deepcopy(deck)
+        Node.__init__(self, parent, committed, holecards, board, deck)
         self.player = player
         self.children = []
         if committed[player] < max(committed):
