@@ -13,9 +13,11 @@ def overlap(t1, t2):
 
 def all_unique(hc):
     for i in range(len(hc)-1):
-        if overlap(hc[i], hc[i+1:]):
-            return False
+        for j in range(i+1,len(hc)):
+            if overlap(hc[i], hc[j]):
+                return False
     return True
+
 
 class GameTree(object):
     def __init__(self, players, deck, holecards, rounds, ante, blinds, history_format = '{holecards}:{boardcards}:{bets}'):
@@ -37,6 +39,8 @@ class GameTree(object):
         self.history_format = history_format
 
     def build(self):
+        # Assume everyone is in
+        players_in = [True] * self.players
         # Collect antes
         committed = [self.ante] * self.players
         self.next_player = 0
@@ -45,16 +49,26 @@ class GameTree(object):
             for blind in blinds:
                 committed[self.next_player] += blind
                 self.next_player = (self.next_player + 1) % self.players
-        hc = [[]] * self.players
+        holes = [[]] * self.players
         board = []
-        self.root = HolecardChanceNode(None, committed, hc, board, deck)
+        self.root = HolecardChanceNode(None, committed, holes, board, deck)
         # Deal holecards
         all_hc = self.holecard_distributions()
-        
+        # Create a child node for every possible distribution
+        for hc in all_hc:
+            cur_holes = hc
+            f = ()
+            for c in cur_holes:
+                f = f + c
+            cur_deck = filter(lambda x: not (x in f), self.deck)
+            self.build_round(self.root, players_in, committed, cur_holes, board, cur_deck)
 
     def deal_holecards(self):
         a = combinations(self.deck, self.holecards)
         return filter(lambda x: all_unique(x), permutations(a, self.players))
+
+    def build_round(self, root, players_in, committed, holes, board, deck):
+        pass
 
     def holecard_distributions(self):
         x = Counter(combinations(self.deck, self.holecards))
@@ -63,7 +77,7 @@ class GameTree(object):
         
 class RoundInfo(object):
     def __init__(self, boardcards, betsize, maxbets):
-        self.boardcards = boardcards,
+        self.boardcards = boardcards
         self.betsize = betsize
         self.maxbets = maxbets
 
