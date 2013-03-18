@@ -61,14 +61,33 @@ class GameTree(object):
             for c in cur_holes:
                 f = f + c
             cur_deck = filter(lambda x: not (x in f), self.deck)
-            self.build_round(self.root, players_in, committed, cur_holes, board, cur_deck)
+            self.build_rounds(self.root, players_in, committed, cur_holes, board, cur_deck, 0)
 
     def deal_holecards(self):
         a = combinations(self.deck, self.holecards)
         return filter(lambda x: all_unique(x), permutations(a, self.players))
 
-    def build_round(self, root, players_in, committed, holes, board, deck):
-        pass
+    def build_rounds(self, root, players_in, committed, holes, board, deck, round_idx):
+        if round_idx == len(self.roundinfo):
+            # showdown
+            return
+        cur_round = self.roundinfo[round_idx]
+        if cur_round.boardcards != None and len(cur_round.boardcards) > 0:
+            deal_boardcards(root, players_in, committed, holes, board, deck, round_idx)
+        else:
+            build_bets(root, players_in, committed, holes, board, deck, round_idx)
+
+    def deal_boardcards(self, root, players_in, committed, holes, board, deck, round_idx):
+        cur_round = self.roundinfo[round_idx]
+        bnode = BoardcardChanceNode(root, committed, holes, board, deck, cur_round.boardcards)
+        all_bc = combinations(deck, cur_round.boardcards)
+        for bc in all_bc:
+            cur_board = board + bc
+            cur_deck = filter(lambda x: not (x in bc), deck)
+            self.build_bets(self, bnode, players_in, committed, holes, cur_board, cur_deck, round_idx)
+
+    def build_bets(self, root, players_in, committed, holes, board, deck, round_idx):
+        self.build_rounds(root, players_in, committed, holes, board, deck, round_idx+1)
 
     def holecard_distributions(self):
         x = Counter(combinations(self.deck, self.holecards))
