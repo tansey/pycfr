@@ -5,5 +5,7 @@ A python implementation of Counterfactual Regret Minimization for flop-style pok
 
 Contributors
 ------------
+
 Wesley Tansey
+
 Hand evaluator code courtesy of [Alvin Liang's library](https://github.com/aliang/pokerhand-eval).
