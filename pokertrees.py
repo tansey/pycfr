@@ -1,7 +1,8 @@
 from itertools import combinations
 from itertools import permutations
 from collections import Counter
-import random
+from card import Card
+from hand_evaluator import HandEvaluator
 
 CHANCE_PLAYER = -1
 
@@ -69,7 +70,7 @@ class GameTree(object):
 
     def build_rounds(self, root, players_in, committed, holes, board, deck, round_idx):
         if round_idx == len(self.roundinfo):
-            # showdown
+            self.showdown(root, players_in, committed, holes, board, deck, round_idx)
             return
         cur_round = self.roundinfo[round_idx]
         if cur_round.boardcards != None and len(cur_round.boardcards) > 0:
@@ -88,6 +89,24 @@ class GameTree(object):
 
     def build_bets(self, root, players_in, committed, holes, board, deck, round_idx):
         self.build_rounds(root, players_in, committed, holes, board, deck, round_idx+1)
+
+    def showdown(self, root, players_in, committed, holes, board, deck, round_idx):
+        scores = [HandEvaluator.evaluate_hand(hc, board) for hc in holes]
+        winners = []
+        maxscore = -1
+        for i,s in enumerate(scores):
+            if players_in[i]:
+                if len(winners) == 0 or s > maxscore:
+                    maxscore = s
+                    winners = [i]
+                elif s == maxscore:
+                    winners.append(i)
+        pot = sum(committed)
+        payoff = pot / float(len(winners))
+        payoffs = [-x for x in committed]
+        for w in winners:
+            payoffs[w] += payoff
+        TerminalNode(root, committed, holecards, board, deck, payoffs)
 
     def holecard_distributions(self):
         x = Counter(combinations(self.deck, self.holecards))
