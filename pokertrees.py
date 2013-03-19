@@ -3,6 +3,7 @@ from itertools import permutations
 from collections import Counter
 from card import Card
 from hand_evaluator import HandEvaluator
+from copy import deepcopy
 
 CHANCE_PLAYER = -1
 
@@ -19,6 +20,11 @@ def all_unique(hc):
                 return False
     return True
 
+class RoundInfo(object):
+    def __init__(self, boardcards, betsize, maxbets):
+        self.boardcards = boardcards
+        self.betsize = betsize
+        self.maxbets = maxbets
 
 class GameTree(object):
     def __init__(self, players, deck, holecards, rounds, ante, blinds, history_format = '{holecards}:{boardcards}:{bets}'):
@@ -34,7 +40,7 @@ class GameTree(object):
         self.players = players
         self.deck = deck
         self.holecards = holecards
-        self.rounds = rounds
+        self.roundinfo = rounds
         self.ante = ante
         self.blinds = blinds
         self.history_format = history_format
@@ -47,19 +53,21 @@ class GameTree(object):
         self.next_player = 0
         # Collect blinds
         if self.blinds != None:
-            for blind in blinds:
+            for blind in self.blinds:
                 committed[self.next_player] += blind
                 self.next_player = (self.next_player + 1) % self.players
         holes = [[]] * self.players
         board = []
-        self.root = HolecardChanceNode(None, committed, holes, board, deck)
+        self.root = HolecardChanceNode(None, committed, holes, board, self.deck, self.holecards)
         # Deal holecards
-        all_hc = self.holecard_distributions()
+        all_hc = self.deal_holecards()
         # Create a child node for every possible distribution
         for hc in all_hc:
             cur_holes = hc
             f = ()
+            print "cur_holes: {0}".format(cur_holes)
             for c in cur_holes:
+                print "f: {0} c: {1}".format(f, c)
                 f = f + c
             cur_deck = filter(lambda x: not (x in f), self.deck)
             self.build_rounds(self.root, players_in, committed, cur_holes, board, cur_deck, 0)
@@ -68,15 +76,17 @@ class GameTree(object):
         a = combinations(self.deck, self.holecards)
         return filter(lambda x: all_unique(x), permutations(a, self.players))
 
-    def build_rounds(self, root, players_in, committed, holes, board, deck, round_idx):
+    def build_rounds(self, root, players_in, committed, holes, board, deck, round_idx, bets = None):
         if round_idx == len(self.roundinfo):
             self.showdown(root, players_in, committed, holes, board, deck)
             return
         cur_round = self.roundinfo[round_idx]
-        if cur_round.boardcards != None and len(cur_round.boardcards) > 0:
+        if cur_round.boardcards:
             self.deal_boardcards(root, players_in, committed, holes, board, deck, round_idx)
         else:
-            self.build_bets(root, players_in, committed, holes, board, deck, round_idx)
+            if bets is None:
+                bets = [0] * self.players
+            self.build_bets(root, players_in, committed, holes, board, deck, round_idx, players_in.count(True), 0, bets)
 
     def deal_boardcards(self, root, players_in, committed, holes, board, deck, round_idx):
         cur_round = self.roundinfo[round_idx]
@@ -98,13 +108,13 @@ class GameTree(object):
                 build_rounds(root, players_in, committed, holes, board, deck, round_idx + 1)
                 return
         cur_round = self.roundinfo[round_idx]
-        anode = ActionNode(root, committed, holecards, board, deck, self.next_player)
+        anode = ActionNode(root, committed, holes, board, deck, self.next_player)
         self.next_player = (self.next_player + 1) % self.players
         if committed[anode.player] < max(committed):
-            self.add_fold_child(root, players_in, committed, holes, board, deck, round_idx, min_actions_this_round, actions_this_round, bets_this_round)
-        self.add_call_child(root, players_in, committed, holes, board, deck, round_idx, min_actions_this_round, actions_this_round, bets_this_round)
+            self.add_fold_child(anode, players_in, committed, holes, board, deck, round_idx, min_actions_this_round, actions_this_round, bets_this_round)
+        self.add_call_child(anode, players_in, committed, holes, board, deck, round_idx, min_actions_this_round, actions_this_round, bets_this_round)
         if cur_round.maxbets[anode.player] > max(bets):
-            self.add_raise_child(root, players_in, committed, holes, board, deck, round_idx, min_actions_this_round, actions_this_round, bets_this_round)
+            self.add_raise_child(anode, players_in, committed, holes, board, deck, round_idx, min_actions_this_round, actions_this_round, bets_this_round)
 
     def all_called_last_raisor_or_folded(self, players_in, bets):
         betlevel = max(bets)
@@ -115,13 +125,13 @@ class GameTree(object):
 
     def add_fold_child(self, root, players_in, committed, holes, board, deck, round_idx, min_actions_this_round, actions_this_round, bets_this_round):
         players_in[root.player] = False
-        self.build_bets(root, players_in, committed, holes, board, deck, round_idx, min_actions_this_round, actions_this_round, bets_this_round)
+        self.build_bets(root, players_in, committed, holes, board, deck, round_idx, min_actions_this_round, actions_this_round + 1, bets_this_round)
         players_in[root.player] = True
 
     def add_call_child(self, root, players_in, committed, holes, board, deck, round_idx, min_actions_this_round, actions_this_round, bets_this_round):
         player_commit = committed[root.player]
         committed[root.player] = max(committed)
-        self.build_bets(root, players_in, committed, holes, board, deck, round_idx, min_actions_this_round, actions_this_round, bets_this_round)
+        self.build_bets(root, players_in, committed, holes, board, deck, round_idx, min_actions_this_round, actions_this_round + 1, bets_this_round)
         committed[root.player] = player_commit
 
     def add_raise_child(self, root, players_in, committed, holes, board, deck, round_idx, min_actions_this_round, actions_this_round, bets_this_round):
@@ -130,7 +140,7 @@ class GameTree(object):
         prev_commit = committed[root.player]
         bets[root.player] = max(bets) + 1
         committed[root.player] += (bets[root.player] - prev_betlevel) * cur_round.betsize
-        self.build_bets(root, players_in, committed, holes, board, deck, round_idx, min_actions_this_round, actions_this_round, bets_this_round)
+        self.build_bets(root, players_in, committed, holes, board, deck, round_idx, min_actions_this_round, actions_this_round + 1, bets_this_round)
         bets[root.player] = prev_betlevel
         committed[root.player] = prev_commit
 
@@ -156,12 +166,6 @@ class GameTree(object):
         x = Counter(combinations(self.deck, self.holecards))
         d = float(sum(x.values()))
         return zip(x.keys(),[y / d for y in x.values()])
-        
-class RoundInfo(object):
-    def __init__(self, boardcards, betsize, maxbets):
-        self.boardcards = boardcards
-        self.betsize = betsize
-        self.maxbets = maxbets
 
 class Node(object):
     def __init__(self, parent, committed, holecards, board, deck):
@@ -185,9 +189,8 @@ class TerminalNode(Node):
         self.payoffs = payoffs
 
 class HolecardChanceNode(Node):
-    def __init__(self, parent, committed, holecards, board, deck, player, todeal):
+    def __init__(self, parent, committed, holecards, board, deck, todeal):
         Node.__init__(self, parent, committed, holecards, board, deck)
-        self.player = player
         self.todeal = todeal
         self.children = []
 
