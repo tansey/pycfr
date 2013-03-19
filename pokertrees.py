@@ -45,11 +45,13 @@ class GameTree(object):
         # Collect antes
         committed = [self.ante] * self.players
         self.next_player = 0
+        self.actions_this_round = 0
         # Collect blinds
         if self.blinds != None:
             for blind in blinds:
                 committed[self.next_player] += blind
                 self.next_player = (self.next_player + 1) % self.players
+                self.actions_this_round += 1
         holes = [[]] * self.players
         board = []
         self.root = HolecardChanceNode(None, committed, holes, board, deck)
@@ -74,9 +76,9 @@ class GameTree(object):
             return
         cur_round = self.roundinfo[round_idx]
         if cur_round.boardcards != None and len(cur_round.boardcards) > 0:
-            deal_boardcards(root, players_in, committed, holes, board, deck, round_idx)
+            self.deal_boardcards(root, players_in, committed, holes, board, deck, round_idx)
         else:
-            build_bets(root, players_in, committed, holes, board, deck, round_idx)
+            self.build_bets(root, players_in, committed, holes, board, deck, round_idx)
 
     def deal_boardcards(self, root, players_in, committed, holes, board, deck, round_idx):
         cur_round = self.roundinfo[round_idx]
@@ -88,6 +90,11 @@ class GameTree(object):
             self.build_bets(self, bnode, players_in, committed, holes, cur_board, cur_deck, round_idx)
 
     def build_bets(self, root, players_in, committed, holes, board, deck, round_idx):
+        if committed[player] < max(committed):
+            self.add_fold_child()
+        self.add_call_child(roundinfo)
+        if roundinfo.maxbets[player] * roundinfo.betsize > committed[player]:
+            self.add_raise_child(roundinfo)
         self.build_rounds(root, players_in, committed, holes, board, deck, round_idx+1)
 
     def showdown(self, root, players_in, committed, holes, board, deck, round_idx):
