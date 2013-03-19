@@ -45,13 +45,11 @@ class GameTree(object):
         # Collect antes
         committed = [self.ante] * self.players
         self.next_player = 0
-        self.actions_this_round = 0
         # Collect blinds
         if self.blinds != None:
             for blind in blinds:
                 committed[self.next_player] += blind
                 self.next_player = (self.next_player + 1) % self.players
-                self.actions_this_round += 1
         holes = [[]] * self.players
         board = []
         self.root = HolecardChanceNode(None, committed, holes, board, deck)
@@ -72,7 +70,7 @@ class GameTree(object):
 
     def build_rounds(self, root, players_in, committed, holes, board, deck, round_idx):
         if round_idx == len(self.roundinfo):
-            self.showdown(root, players_in, committed, holes, board, deck, round_idx)
+            self.showdown(root, players_in, committed, holes, board, deck)
             return
         cur_round = self.roundinfo[round_idx]
         if cur_round.boardcards != None and len(cur_round.boardcards) > 0:
@@ -89,15 +87,54 @@ class GameTree(object):
             cur_deck = filter(lambda x: not (x in bc), deck)
             self.build_bets(self, bnode, players_in, committed, holes, cur_board, cur_deck, round_idx)
 
-    def build_bets(self, root, players_in, committed, holes, board, deck, round_idx):
-        if committed[player] < max(committed):
-            self.add_fold_child()
-        self.add_call_child(roundinfo)
-        if roundinfo.maxbets[player] * roundinfo.betsize > committed[player]:
-            self.add_raise_child(roundinfo)
-        self.build_rounds(root, players_in, committed, holes, board, deck, round_idx+1)
+    def build_bets(self, root, players_in, committed, holes, board, deck, round_idx, min_actions_this_round, actions_this_round, bets_this_round):
+        if actions_this_round >= min_actions_this_round:
+            # if everyone else folded, end the hand
+            if players_in.count(True) == 1:
+                self.showdown(root, players_in, committed, holes, board, deck)
+                return
+            # if everyone checked or the last raisor has been called, end the round
+            if self.all_called_last_raisor_or_folded(players_in, bets_this_round):
+                build_rounds(root, players_in, committed, holes, board, deck, round_idx + 1)
+                return
+        cur_round = self.roundinfo[round_idx]
+        anode = ActionNode(root, committed, holecards, board, deck, self.next_player)
+        self.next_player = (self.next_player + 1) % self.players
+        if committed[anode.player] < max(committed):
+            self.add_fold_child(root, players_in, committed, holes, board, deck, round_idx, min_actions_this_round, actions_this_round, bets_this_round)
+        self.add_call_child(root, players_in, committed, holes, board, deck, round_idx, min_actions_this_round, actions_this_round, bets_this_round)
+        if cur_round.maxbets[anode.player] > max(bets):
+            self.add_raise_child(root, players_in, committed, holes, board, deck, round_idx, min_actions_this_round, actions_this_round, bets_this_round)
 
-    def showdown(self, root, players_in, committed, holes, board, deck, round_idx):
+    def all_called_last_raisor_or_folded(self, players_in, bets):
+        betlevel = max(bets)
+        for i in enumerate(bets):
+            if players_in[i] and bets[i] < betlevel:
+                return False
+        return True
+
+    def add_fold_child(self, root, players_in, committed, holes, board, deck, round_idx, min_actions_this_round, actions_this_round, bets_this_round):
+        players_in[root.player] = False
+        self.build_bets(root, players_in, committed, holes, board, deck, round_idx, min_actions_this_round, actions_this_round, bets_this_round)
+        players_in[root.player] = True
+
+    def add_call_child(self, root, players_in, committed, holes, board, deck, round_idx, min_actions_this_round, actions_this_round, bets_this_round):
+        player_commit = committed[root.player]
+        committed[root.player] = max(committed)
+        self.build_bets(root, players_in, committed, holes, board, deck, round_idx, min_actions_this_round, actions_this_round, bets_this_round)
+        committed[root.player] = player_commit
+
+    def add_raise_child(self, root, players_in, committed, holes, board, deck, round_idx, min_actions_this_round, actions_this_round, bets_this_round):
+        cur_round = self.roundinfo(cur_round)
+        prev_betlevel = bets[root.player]
+        prev_commit = committed[root.player]
+        bets[root.player] = max(bets) + 1
+        committed[root.player] += (bets[root.player] - prev_betlevel) * cur_round.betsize
+        self.build_bets(root, players_in, committed, holes, board, deck, round_idx, min_actions_this_round, actions_this_round, bets_this_round)
+        bets[root.player] = prev_betlevel
+        committed[root.player] = prev_commit
+
+    def showdown(self, root, players_in, committed, holes, board, deck):
         scores = [HandEvaluator.evaluate_hand(hc, board) for hc in holes]
         winners = []
         maxscore = -1
@@ -136,19 +173,6 @@ class Node(object):
             self.parent = parent
             self.parent.add_child(self)
 
-    def all_but_one_folded(self, players_in):
-        return len(filter(lambda x: x,players_in)) == 1
-
-    def all_checked(self, players_in, bets):
-        return len(history) == len(players_in) and max(bets) == 0
-
-    def all_called_last_raisor_or_folded(self, players_in, bets):
-        betlevel = max(bets)
-        for i in enumerate(bets):
-            if players_in[i] and bets[i] < betlevel:
-                return False
-        return True
-
     def add_child(self, child):
         if self.children is None:
             self.children = [child]
@@ -174,24 +198,10 @@ class BoardcardChanceNode(Node):
         self.children = []        
 
 class ActionNode(Node):
-    def __init__(self, parent, committed, holecards, board, deck, player, roundinfo):
+    def __init__(self, parent, committed, holecards, board, deck, player):
         Node.__init__(self, parent, committed, holecards, board, deck)
         self.player = player
         self.children = []
-        if committed[player] < max(committed):
-            self.add_fold_child()
-        self.add_call_child(roundinfo)
-        if roundinfo.maxbets[player] * roundinfo.betsize > committed[player]:
-            self.add_raise_child(roundinfo)
-
-    def add_fold_child(self):
-        pass
-
-    def add_call_child(self, roundinfo):
-        pass
-
-    def add_raise_child(self, roundinfo):
-        pass
 
 class PlayerTree(GameTree):
     def __init__(self, player, players, deck, holecards, rounds, ante, blinds, history_format = '{holecards}:{boardcards}:{bets}'):
