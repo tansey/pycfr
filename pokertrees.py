@@ -23,10 +23,8 @@ def all_unique(hc):
                 return False
     return True
 
-def evaluate_twocard_hand(hand):
-    if hand[0].rank == hand[1].rank:
-        return 15*14+hand[0].rank
-    return max(hand[0].rank, hand[1].rank) * 14 + min(hand[0].rank, hand[1].rank)
+def default_infoset_format(player, holecards, board, bet_history):
+    return "{0}{1}:{2}:".format("".join([str(x) for x in holecards[player]]), "".join([str(x) for x in board]), bet_history)
 
 class RoundInfo(object):
     def __init__(self, boardcards, betsize, maxbets):
@@ -35,7 +33,7 @@ class RoundInfo(object):
         self.maxbets = maxbets
 
 class GameTree(object):
-    def __init__(self, players, deck, holecards, rounds, ante, blinds, history_format = '{holecards}:{boardcards}:{bets}'):
+    def __init__(self, players, deck, holecards, rounds, ante, blinds, handeval = HandEvaluator.evaluate_hand, infoset_format=default_infoset_format):
         assert(players >= 2)
         assert(ante >= 0)
         assert(rounds != None)
@@ -53,7 +51,8 @@ class GameTree(object):
         self.roundinfo = rounds
         self.ante = ante
         self.blinds = blinds
-        self.history_format = history_format
+        self.handeval = handeval
+        self.infoset_format = infoset_format
         self.information_sets = {}
 
     def build(self):
@@ -121,7 +120,7 @@ class GameTree(object):
             self.build_rounds(root, players_in, committed, holes, board, deck, bet_history, round_idx + 1)
             return
         cur_round = self.roundinfo[round_idx]
-        anode = ActionNode(root, committed, holes, board, deck, bet_history, next_player)
+        anode = ActionNode(root, committed, holes, board, deck, bet_history, next_player, self.infoset_format)
         # add the node to the information set
         if not (anode.player_view in self.information_sets):
             self.information_sets[anode.player_view] = []
@@ -181,13 +180,7 @@ class GameTree(object):
             winners = [i for i,v in enumerate(players_in) if v]
         else:
             handsize = len(holes[0]) + len(board)
-            if handsize == 1:
-                scores = [(hc + board)[0].rank for hc in holes]
-            elif handsize == 2:
-                temphands = [hc + board for hc in holes]
-                scores = [evaluate_twocard_hand(hc) for hc in temphands]
-            else:
-                scores = [HandEvaluator.evaluate_hand(hc, board) for hc in holes]
+            scores = [self.handeval(hc, board) for hc in holes]
             winners = []
             maxscore = -1
             for i,s in enumerate(scores):
@@ -244,14 +237,14 @@ class BoardcardChanceNode(Node):
         self.children = []
 
 class ActionNode(Node):
-    def __init__(self, parent, committed, holecards, board, deck, bet_history, player):
+    def __init__(self, parent, committed, holecards, board, deck, bet_history, player, infoset_format):
         Node.__init__(self, parent, committed, holecards, board, deck, bet_history)
         self.player = player
         self.children = []
         self.raise_action = None
         self.call_action = None
         self.fold_action = None
-        self.player_view = "{0}{1}:{2}".format("".join([str(x) for x in self.holecards[self.player]]), "".join([str(x) for x in self.board]), self.bet_history)
+        self.player_view = infoset_format(player, holecards, board, bet_history)
 
     def valid(self, action):
         if action == FOLD:
@@ -261,8 +254,3 @@ class ActionNode(Node):
         if action == RAISE:
             return self.raise_action
         raise Exception("Unknown action {0}. Action must be FOLD, CALL, or RAISE".format(action))
-
-class OpponentNode(Node):
-    def __init__(self, parent, opponent):
-        Node.__init__(self, parent)
-        self.opponent = opponent
