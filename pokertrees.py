@@ -140,7 +140,7 @@ class GameTree(object):
         players_in[root.player] = False
         bet_history += 'f'
         self.build_bets(root, next_player, players_in, committed, holes, board, deck, bet_history, round_idx, min_actions_this_round, actions_this_round + 1, bets_this_round)
-        # TODO: root.fold_action = root.children[-1]
+        root.fold_action = root.children[-1]
         players_in[root.player] = True
 
     def add_call_child(self, root, next_player, players_in, committed, holes, board, deck, bet_history, round_idx, min_actions_this_round, actions_this_round, bets_this_round):
@@ -149,8 +149,8 @@ class GameTree(object):
         committed[root.player] = max(committed)
         bets_this_round[root.player] = max(bets_this_round)
         bet_history += 'c'
-        #print "In: {0} Committed: {1} Holes: {2} Board: {3} Deck: {4} Round: {5} MinActions: {6} CurActions: {7} BetsThisRound: {8}".format(players_in, committed, holes, board, deck, round_idx, min_actions_this_round, actions_this_round + 1, bets_this_round)
         self.build_bets(root, next_player, players_in, committed, holes, board, deck, bet_history, round_idx, min_actions_this_round, actions_this_round + 1, bets_this_round)
+        root.call_action = root.children[-1]
         committed[root.player] = player_commit
         bets_this_round[root.player] = player_bets
 
@@ -162,6 +162,7 @@ class GameTree(object):
         committed[root.player] += (bets_this_round[root.player] - prev_betlevel) * cur_round.betsize
         bet_history += 'r'
         self.build_bets(root, next_player, players_in, committed, holes, board, deck, bet_history, round_idx, min_actions_this_round, actions_this_round + 1, bets_this_round)
+        root.raise_action = root.children[-1]
         bets_this_round[root.player] = prev_betlevel
         committed[root.player] = prev_commit
 
