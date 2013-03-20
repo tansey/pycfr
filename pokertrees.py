@@ -6,6 +6,9 @@ from hand_evaluator import HandEvaluator
 from copy import deepcopy
 
 CHANCE_PLAYER = -1
+FOLD = 0
+CALL = 1
+RAISE = 2
 
 def overlap(t1, t2):
     for x in t1:
@@ -249,6 +252,15 @@ class ActionNode(Node):
         self.call_action = None
         self.fold_action = None
         self.player_view = "{0}{1}:{2}".format("".join([str(x) for x in self.holecards[self.player]]), "".join([str(x) for x in self.board]), self.bet_history)
+
+    def valid(self, action):
+        if action == FOLD:
+            return self.fold_action
+        if action == CALL:
+            return self.call_action
+        if action == RAISE:
+            return self.raise_action
+        raise Exception("Unknown action {0}. Action must be FOLD, CALL, or RAISE".format(action))
 
 class OpponentNode(Node):
     def __init__(self, parent, opponent):
