@@ -42,6 +42,8 @@ class GameTree(object):
         if blinds != None:
             if type(blinds) is int or type(blinds) is float:
                 blinds = [blinds]
+        for r in rounds:
+            assert(len(r.maxbets) == players)
         self.players = players
         self.deck = deck
         self.holecards = holecards
