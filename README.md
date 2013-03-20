@@ -3,6 +3,8 @@ pyCFR
 
 A python implementation of Counterfactual Regret Minimization for flop-style poker games like Texas Hold'em, Leduc, and Kuhn poker.
 
+Note that this library is intended for *very* simple games. It is written in pure python and is not optimized for speed nor memory usage. Full-scale Texas Hold'em will likely be too slow and too big to handle.
+
 Creating a game tree
 --------------------
 To generate a tree for a game, simply specify the rules of the game:

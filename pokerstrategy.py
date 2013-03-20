@@ -19,3 +19,9 @@ class Strategy(object):
     def probdist(self, infoset):
         assert(infoset in policy)
         return policy[infoset]
+
+    def load_from_file(self, filename):
+        pass
+
+    def save_to_file(self, filename):
+        pass
