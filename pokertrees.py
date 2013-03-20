@@ -49,6 +49,7 @@ class GameTree(object):
         self.ante = ante
         self.blinds = blinds
         self.history_format = history_format
+        self.information_sets = {}
 
     def build(self):
         # Assume everyone is in
@@ -116,6 +117,10 @@ class GameTree(object):
             return
         cur_round = self.roundinfo[round_idx]
         anode = ActionNode(root, committed, holes, board, deck, bet_history, next_player)
+        # add the node to the information set
+        if not (anode.player_view in self.information_sets):
+            self.information_sets[anode.player_view] = []
+        self.information_sets[anode.player_view].append(anode)
         # get the next player to act
         next_player = (next_player + 1) % self.players
         while not players_in[next_player]:
@@ -190,8 +195,6 @@ class GameTree(object):
         pot = sum(committed)
         payoff = pot / float(len(winners))
         payoffs = [-x for x in committed]
-        #if players_in.count(True) > 1:
-        #    print "Pot: {0} Payoff: {1} Winners: {2} Holes: {3} Board: {4}".format(pot, payoff, winners, holes, board)
         for w in winners:
             payoffs[w] += payoff
         TerminalNode(root, committed, holes, board, deck, bet_history, payoffs)
@@ -243,11 +246,7 @@ class ActionNode(Node):
         self.raise_action = None
         self.call_action = None
         self.fold_action = None
-
-class PlayerView(GameTree):
-    def __init__(self, player, players, deck, holecards, rounds, ante, blinds, history_format = '{holecards}:{boardcards}:{bets}'):
-        GameTree.__init__(self, players, deck, holecards, rounds, ante, blinds, history_format)
-        self.player = player
+        self.player_view = "{0}{1}:{2}".format("".join([str(x) for x in self.holecards[self.player]]), "".join([str(x) for x in self.board]), self.bet_history)
 
 class OpponentNode(Node):
     def __init__(self, parent, opponent):

@@ -36,7 +36,7 @@ class Card:
         self.suit = suit
     
     def __repr__(self):
-        return "<Card(%s%s)>" % (self.RANK_TO_STRING[self.rank], self.SUIT_TO_STRING[self.suit])
+        return "%s%s" % (self.RANK_TO_STRING[self.rank], self.SUIT_TO_STRING[self.suit])
     
     def __eq__(self, other):
         return (isinstance(other, self.__class__) and self.rank == other.rank and self.suit == other.suit)
