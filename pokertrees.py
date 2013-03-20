@@ -20,6 +20,11 @@ def all_unique(hc):
                 return False
     return True
 
+def evaluate_twocard_hand(hand):
+    if hand[0].rank == hand[1].rank:
+        return 15*14+hand[0].rank
+    return max(hand[0].rank, hand[1].rank) * 14 + min(hand[0].rank, hand[1].rank)
+
 class RoundInfo(object):
     def __init__(self, boardcards, betsize, maxbets):
         self.boardcards = boardcards
@@ -50,14 +55,16 @@ class GameTree(object):
         players_in = [True] * self.players
         # Collect antes
         committed = [self.ante] * self.players
-        self.next_player = 0
+        next_player = 0
+        bets = [0] * self.players
         # Collect blinds
         if self.blinds != None:
             for blind in self.blinds:
-                committed[self.next_player] += blind
-                self.next_player = (self.next_player + 1) % self.players
+                committed[next_player] += blind
+                bets[next_player] = int((committed[next_player] - self.ante) / self.roundinfo[0].betsize)
+                next_player = (next_player + 1) % self.players
         holes = [[]] * self.players
-        board = []
+        board = ()
         self.root = HolecardChanceNode(None, committed, holes, board, self.deck, self.holecards)
         # Deal holecards
         all_hc = self.deal_holecards()
@@ -65,102 +72,123 @@ class GameTree(object):
         for hc in all_hc:
             cur_holes = hc
             f = ()
-            print "cur_holes: {0}".format(cur_holes)
             for c in cur_holes:
-                print "f: {0} c: {1}".format(f, c)
                 f = f + c
             cur_deck = filter(lambda x: not (x in f), self.deck)
-            self.build_rounds(self.root, players_in, committed, cur_holes, board, cur_deck, 0)
+            self.build_rounds(self.root, players_in, committed, cur_holes, board, cur_deck, 0, bets, next_player)
 
     def deal_holecards(self):
         a = combinations(self.deck, self.holecards)
         return filter(lambda x: all_unique(x), permutations(a, self.players))
 
-    def build_rounds(self, root, players_in, committed, holes, board, deck, round_idx, bets = None):
+    def build_rounds(self, root, players_in, committed, holes, board, deck, round_idx, bets = None, next_player = 0):
         if round_idx == len(self.roundinfo):
             self.showdown(root, players_in, committed, holes, board, deck)
             return
         cur_round = self.roundinfo[round_idx]
+        while not players_in[next_player]:
+            next_player = (next_player + 1) % self.players
         if cur_round.boardcards:
-            self.deal_boardcards(root, players_in, committed, holes, board, deck, round_idx)
+            self.deal_boardcards(root, next_player, players_in, committed, holes, board, deck, round_idx)
         else:
             if bets is None:
                 bets = [0] * self.players
-            self.build_bets(root, players_in, committed, holes, board, deck, round_idx, players_in.count(True), 0, bets)
+            self.build_bets(root, next_player, players_in, committed, holes, board, deck, round_idx, players_in.count(True), 0, bets)
 
-    def deal_boardcards(self, root, players_in, committed, holes, board, deck, round_idx):
+    def deal_boardcards(self, root, next_player, players_in, committed, holes, board, deck, round_idx):
         cur_round = self.roundinfo[round_idx]
         bnode = BoardcardChanceNode(root, committed, holes, board, deck, cur_round.boardcards)
         all_bc = combinations(deck, cur_round.boardcards)
         for bc in all_bc:
             cur_board = board + bc
             cur_deck = filter(lambda x: not (x in bc), deck)
-            self.build_bets(self, bnode, players_in, committed, holes, cur_board, cur_deck, round_idx)
+            self.build_bets(bnode, next_player, players_in, committed, holes, cur_board, cur_deck, round_idx, players_in.count(True), 0, [0] * self.players)
 
-    def build_bets(self, root, players_in, committed, holes, board, deck, round_idx, min_actions_this_round, actions_this_round, bets_this_round):
-        if actions_this_round >= min_actions_this_round:
-            # if everyone else folded, end the hand
-            if players_in.count(True) == 1:
-                self.showdown(root, players_in, committed, holes, board, deck)
-                return
-            # if everyone checked or the last raisor has been called, end the round
-            if self.all_called_last_raisor_or_folded(players_in, bets_this_round):
-                build_rounds(root, players_in, committed, holes, board, deck, round_idx + 1)
-                return
+    def build_bets(self, root, next_player, players_in, committed, holes, board, deck, round_idx, min_actions_this_round, actions_this_round, bets_this_round):
+        # if everyone else folded, end the hand
+        if players_in.count(True) == 1:
+            self.showdown(root, players_in, committed, holes, board, deck)
+            return
+        # if everyone checked or the last raisor has been called, end the round
+        if actions_this_round >= min_actions_this_round and self.all_called_last_raisor_or_folded(players_in, bets_this_round):
+            self.build_rounds(root, players_in, committed, holes, board, deck, round_idx + 1)
+            return
         cur_round = self.roundinfo[round_idx]
-        anode = ActionNode(root, committed, holes, board, deck, self.next_player)
-        self.next_player = (self.next_player + 1) % self.players
+        anode = ActionNode(root, committed, holes, board, deck, next_player)
+        # get the next player to act
+        next_player = (next_player + 1) % self.players
+        while not players_in[next_player]:
+            next_player = (next_player + 1) % self.players
+        # add a folding option if someone has bet more than this player
         if committed[anode.player] < max(committed):
-            self.add_fold_child(anode, players_in, committed, holes, board, deck, round_idx, min_actions_this_round, actions_this_round, bets_this_round)
-        self.add_call_child(anode, players_in, committed, holes, board, deck, round_idx, min_actions_this_round, actions_this_round, bets_this_round)
-        if cur_round.maxbets[anode.player] > max(bets):
-            self.add_raise_child(anode, players_in, committed, holes, board, deck, round_idx, min_actions_this_round, actions_this_round, bets_this_round)
+            self.add_fold_child(anode, next_player, players_in, committed, holes, board, deck, round_idx, min_actions_this_round, actions_this_round, bets_this_round)
+        # add a calling/checking option
+        self.add_call_child(anode, next_player, players_in, committed, holes, board, deck, round_idx, min_actions_this_round, actions_this_round, bets_this_round)
+        # add a raising option if this player has not reached their max bet level
+        if cur_round.maxbets[anode.player] > max(bets_this_round):
+            self.add_raise_child(anode, next_player, players_in, committed, holes, board, deck, round_idx, min_actions_this_round, actions_this_round, bets_this_round)
 
     def all_called_last_raisor_or_folded(self, players_in, bets):
         betlevel = max(bets)
-        for i in enumerate(bets):
+        for i,v in enumerate(bets):
             if players_in[i] and bets[i] < betlevel:
                 return False
         return True
 
-    def add_fold_child(self, root, players_in, committed, holes, board, deck, round_idx, min_actions_this_round, actions_this_round, bets_this_round):
+    def add_fold_child(self, root, next_player, players_in, committed, holes, board, deck, round_idx, min_actions_this_round, actions_this_round, bets_this_round):
         players_in[root.player] = False
-        self.build_bets(root, players_in, committed, holes, board, deck, round_idx, min_actions_this_round, actions_this_round + 1, bets_this_round)
+        self.build_bets(root, next_player, players_in, committed, holes, board, deck, round_idx, min_actions_this_round, actions_this_round + 1, bets_this_round)
         players_in[root.player] = True
 
-    def add_call_child(self, root, players_in, committed, holes, board, deck, round_idx, min_actions_this_round, actions_this_round, bets_this_round):
+    def add_call_child(self, root, next_player, players_in, committed, holes, board, deck, round_idx, min_actions_this_round, actions_this_round, bets_this_round):
         player_commit = committed[root.player]
+        player_bets = bets_this_round[root.player]
         committed[root.player] = max(committed)
-        self.build_bets(root, players_in, committed, holes, board, deck, round_idx, min_actions_this_round, actions_this_round + 1, bets_this_round)
+        bets_this_round[root.player] = max(bets_this_round)
+        #print "In: {0} Committed: {1} Holes: {2} Board: {3} Deck: {4} Round: {5} MinActions: {6} CurActions: {7} BetsThisRound: {8}".format(players_in, committed, holes, board, deck, round_idx, min_actions_this_round, actions_this_round + 1, bets_this_round)
+        self.build_bets(root, next_player, players_in, committed, holes, board, deck, round_idx, min_actions_this_round, actions_this_round + 1, bets_this_round)
         committed[root.player] = player_commit
+        bets_this_round[root.player] = player_bets
 
-    def add_raise_child(self, root, players_in, committed, holes, board, deck, round_idx, min_actions_this_round, actions_this_round, bets_this_round):
-        cur_round = self.roundinfo(cur_round)
-        prev_betlevel = bets[root.player]
+    def add_raise_child(self, root, next_player, players_in, committed, holes, board, deck, round_idx, min_actions_this_round, actions_this_round, bets_this_round):
+        cur_round = self.roundinfo[round_idx]
+        prev_betlevel = bets_this_round[root.player]
         prev_commit = committed[root.player]
-        bets[root.player] = max(bets) + 1
-        committed[root.player] += (bets[root.player] - prev_betlevel) * cur_round.betsize
-        self.build_bets(root, players_in, committed, holes, board, deck, round_idx, min_actions_this_round, actions_this_round + 1, bets_this_round)
-        bets[root.player] = prev_betlevel
+        bets_this_round[root.player] = max(bets_this_round) + 1
+        committed[root.player] += (bets_this_round[root.player] - prev_betlevel) * cur_round.betsize
+        self.build_bets(root, next_player, players_in, committed, holes, board, deck, round_idx, min_actions_this_round, actions_this_round + 1, bets_this_round)
+        bets_this_round[root.player] = prev_betlevel
         committed[root.player] = prev_commit
 
     def showdown(self, root, players_in, committed, holes, board, deck):
-        scores = [HandEvaluator.evaluate_hand(hc, board) for hc in holes]
-        winners = []
-        maxscore = -1
-        for i,s in enumerate(scores):
-            if players_in[i]:
-                if len(winners) == 0 or s > maxscore:
-                    maxscore = s
-                    winners = [i]
-                elif s == maxscore:
-                    winners.append(i)
+        if players_in.count(True) == 1:
+            winners = [i for i,v in enumerate(players_in) if v]
+        else:
+            handsize = len(holes[0]) + len(board)
+            if handsize == 1:
+                scores = [(hc + board)[0].rank for hc in holes]
+            elif handsize == 2:
+                temphands = [hc + board for hc in holes]
+                scores = [evaluate_twocard_hand(hc) for hc in temphands]
+            else:
+                scores = [HandEvaluator.evaluate_hand(hc, board) for hc in holes]
+            winners = []
+            maxscore = -1
+            for i,s in enumerate(scores):
+                if players_in[i]:
+                    if len(winners) == 0 or s > maxscore:
+                        maxscore = s
+                        winners = [i]
+                    elif s == maxscore:
+                        winners.append(i)
         pot = sum(committed)
         payoff = pot / float(len(winners))
         payoffs = [-x for x in committed]
+        #if players_in.count(True) > 1:
+        #    print "Pot: {0} Payoff: {1} Winners: {2} Holes: {3} Board: {4}".format(pot, payoff, winners, holes, board)
         for w in winners:
             payoffs[w] += payoff
-        TerminalNode(root, committed, holecards, board, deck, payoffs)
+        TerminalNode(root, committed, holes, board, deck, payoffs)
 
     def holecard_distributions(self):
         x = Counter(combinations(self.deck, self.holecards))
