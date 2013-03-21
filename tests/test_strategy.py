@@ -63,13 +63,26 @@ rand0.load_from_file('strategies/leduc/random.strat')
 rand1 = Strategy(1)
 rand1.load_from_file('strategies/leduc/random.strat')
 
+"""
+All leduc test values were derived using the open_cfr implementation from UoAlberta
+"""
 print "Leduc"
-print "Nash0 vs. Nash1 EV: {0}".format(StrategyProfile(leduc_gametree, [s0,s1]).expected_value())
+result = StrategyProfile(leduc_gametree, [s0,s1]).expected_value()
+print "Nash0 vs. Nash1 EV: {0}".format(result)
+assert(result[0] >= -0.085653 and result[0] <= -0.085651)
+
 print "Nash0 vs. Eq1 EV: {0}".format(StrategyProfile(leduc_gametree, [s0,eq1]).expected_value())
 print "Eq0 vs. Nash1 EV: {0}".format(StrategyProfile(leduc_gametree, [eq0,s1]).expected_value())
 print "Eq0 vs. Eq1: {0}".format(StrategyProfile(leduc_gametree, [eq0,eq1]).expected_value())
-print "Nash0 vs. Random: {0}".format(StrategyProfile(leduc_gametree, [s0,rand1]).expected_value())
-print "Random vs. Nash1: {0}".format(StrategyProfile(leduc_gametree, [rand0,s1]).expected_value())
+
+result = StrategyProfile(leduc_gametree, [s0,rand1]).expected_value()
+print "Nash0 vs. Random: {0}".format(result)
+assert(result[0] >= 0.591873 and result[0] <= 0.591875)
+
+result = StrategyProfile(leduc_gametree, [rand0,s1]).expected_value()
+print "Random vs. Nash1: {0}".format(result)
+assert(result[0] >= -0.84791 and result[0] <= -0.84790)
+
 print ""
 
 print 'All passed!'
