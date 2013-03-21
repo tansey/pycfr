@@ -48,6 +48,10 @@ class StrategyProfile(object):
         self.strategies = strategies
 
     def expected_value(self):
+        """
+        Calculates the expected value of each strategy in the profile.
+        Returns an array of scalars corresponding to the expected payoffs.
+        """
         return self.ev_helper(self.gametree.root, 1)
 
     def ev_helper(self, root, pathprob, depth = 0):
@@ -79,4 +83,10 @@ class StrategyProfile(object):
                 payoffs[i] += p
         return payoffs
 
+    def best_response(self, player):
+        """
+        Calculates the best response of the given player to the strategy profile.
+        Returns the best response strategy.
+        """
+        pass
 
