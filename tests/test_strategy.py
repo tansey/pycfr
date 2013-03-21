@@ -71,9 +71,17 @@ result = StrategyProfile(leduc_gametree, [s0,s1]).expected_value()
 print "Nash0 vs. Nash1 EV: {0}".format(result)
 assert(result[0] >= -0.085653 and result[0] <= -0.085651)
 
-print "Nash0 vs. Eq1 EV: {0}".format(StrategyProfile(leduc_gametree, [s0,eq1]).expected_value())
-print "Eq0 vs. Nash1 EV: {0}".format(StrategyProfile(leduc_gametree, [eq0,s1]).expected_value())
-print "Eq0 vs. Eq1: {0}".format(StrategyProfile(leduc_gametree, [eq0,eq1]).expected_value())
+result = StrategyProfile(leduc_gametree, [s0,eq1]).expected_value()
+print "Nash0 vs. Eq1 EV: {0}".format(result)
+assert(result[0] >= 0.59143 and result[0] <= 0.59145)
+
+result = StrategyProfile(leduc_gametree, [eq0,eq1]).expected_value()
+print "Eq0 vs. Eq1: {0}".format(result)
+assert(result[0] >= -0.078126 and result[0] <= -0.078124)
+
+result = StrategyProfile(leduc_gametree, [eq0,s1]).expected_value()
+print "Eq0 vs. Nash1 EV: {0}".format(result)
+assert(result[0] >= -0.840442 and result[0] <= -0.840440)
 
 result = StrategyProfile(leduc_gametree, [s0,rand1]).expected_value()
 print "Nash0 vs. Random: {0}".format(result)
