@@ -45,7 +45,7 @@ s1 = Strategy(1)
 s1.load_from_file('strategies/leduc/1.strat')
 
 # Create a strategy profile for this game
-profile = StrategyProfile(leduc_gametree, [s0,s1])
+profile = StrategyProfile(gametree, [s0,s1])
 
 ev = profile.expected_value()
 ```
