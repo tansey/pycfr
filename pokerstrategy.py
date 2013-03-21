@@ -53,12 +53,10 @@ class StrategyProfile(object):
     def ev_helper(self, root, pathprob, depth = 0):
         if type(root) is TerminalNode:
             payoffs = [x*pathprob for x in root.payoffs]
-            #print '{0}Probpath: {1:.9f} Raw Payoffs: {2} Weighted: {3}'.format('\t'*depth, pathprob, root.payoffs, [float("{0:.4f}".format(x)) for x in payoffs])
             return payoffs
         if type(root) is HolecardChanceNode or type(root) is BoardcardChanceNode:
             payoffs = [0] * self.gametree.players
             prob = pathprob / float(len(root.children))
-            #print '{0}Probpath: {1:.9f} Holes: {2} Board: {3} Children: {4}'.format('\t'*depth, pathprob, root.holecards, root.board, len(root.children))
             for child in root.children:
                 subpayoffs = self.ev_helper(child, prob, depth+1)
                 for i,p in enumerate(subpayoffs):
@@ -66,7 +64,6 @@ class StrategyProfile(object):
             return payoffs
         # Otherwise, it's an ActionNode
         probs = self.strategies[root.player].probs(root.player_view)
-        #print '{0}Probpath: {1:.9f} PlayerView: {2} ActionProbs: {3}'.format('\t'*depth, pathprob, root.player_view, probs)
         payoffs = [0] * self.gametree.players
         if root.fold_action and probs[FOLD] > 0.0000000001:
             subpayoffs = self.ev_helper(root.fold_action, pathprob * probs[FOLD], depth+1)
