@@ -18,15 +18,36 @@ holecards = 1
 rounds = [RoundInfo(boardcards=0,betsize=1,maxbets=[2,2]),RoundInfo(boardcards=1,betsize=2,maxbets=[2,2])]
 ante = 1
 blinds = [1,2]
-tree = GameTree(players, deck, holecards, rounds, ante, blinds, handeval=leduc_eval)
-tree.build()
+gametree = GameTree(players, deck, holecards, rounds, ante, blinds, handeval=leduc_eval)
+gametree.build()
 ```
 
 Or use one of the pre-built games:
 
 ```python
 from pokergames import *
-tree = leduc()
+gametree = leduc()
+```
+
+Evaluating a strategy profile
+-----------------------------
+You can calculate the expected value of a set of strategies for a game:
+
+```python
+gametree = leduc()
+
+# load first player strategy
+s0 = Strategy(0)
+s0.load_from_file('strategies/leduc/0.strat')
+
+# load second player strategy
+s1 = Strategy(1)
+s1.load_from_file('strategies/leduc/1.strat')
+
+# Create a strategy profile for this game
+profile = StrategyProfile(leduc_gametree, [s0,s1])
+
+ev = profile.expected_value()
 ```
 
 Tests
@@ -37,11 +58,12 @@ Tests for the game tree code are implemented in the `tests` directory.
 
 - test_strategy.py - Tests the strategy functionality by loading some pre-computed near-optimal strategies for Leduc poker and a default equal-probability policy.
 
+Note the tests are intended to be run from the main directory, e.g. `python test/test_gametree.py`. They make some assumptions about relative paths when importing modules and loading and saving files.
+
 TODO
 ----
 The following is a list of items that still need to be implemented:
 
-- Expected value of a strategy profile
 - Best response
 - Exploitability (EV of BR)
 - CFR
