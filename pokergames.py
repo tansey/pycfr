@@ -43,7 +43,7 @@ def leduc():
     holecards = 1
     ante = 1
     blinds = None
-    rounds = [RoundInfo(boardcards=0,betsize=1,maxbets=[2,2]),RoundInfo(boardcards=1,betsize=2,maxbets=[2,2])]
+    rounds = [RoundInfo(boardcards=0,betsize=2,maxbets=[2,2]),RoundInfo(boardcards=1,betsize=4,maxbets=[2,2])]
     tree = GameTree(players, deck, holecards, rounds, ante, blinds, handeval=leduc_eval, infoset_format=leduc_format)
     tree.build()
     return tree
