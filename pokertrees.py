@@ -4,6 +4,7 @@ from collections import Counter
 from card import Card
 from hand_evaluator import HandEvaluator
 from copy import deepcopy
+from functools import partial
 
 CHANCE_PLAYER = -1
 FOLD = 0
@@ -76,9 +77,9 @@ class GameTree(object):
                 next_player = (next_player + 1) % self.players
         return next_player
 
-    def deal_holecards(self, deck, holecards):
+    def deal_holecards(self, deck, holecards, players):
         a = combinations(deck, holecards)
-        return filter(lambda x: all_unique(x), permutations(a, self.players))
+        return filter(lambda x: all_unique(x), permutations(a, players))
 
     def build_rounds(self, root, players_in, committed, holes, board, deck, bet_history, round_idx, bets = None, next_player = 0):
         if round_idx == len(self.roundinfo):
@@ -107,13 +108,17 @@ class GameTree(object):
         cur_round = self.roundinfo[round_idx]
         hnode = HolecardChanceNode(root, committed, holes, board, self.deck, "", cur_round.holecards)
         # Deal holecards
-        all_hc = self.deal_holecards(deck, cur_round.holecards)
+        all_hc = self.deal_holecards(deck, cur_round.holecards, players_in.count(True))
         # Create a child node for every possible distribution
         for cur_holes in all_hc:
             dealt_cards = ()
             cur_holes = list(cur_holes)
+            cur_idx = 0
             for i,hc in enumerate(holes):
-                cur_holes[i] = hc + cur_holes[i]
+                # Only deal cards to players who are still in
+                if players_in[i]:
+                    cur_holes[cur_idx] = hc + cur_holes[cur_idx]
+                    cur_idx += 1
             for hc in cur_holes:
                 dealt_cards += hc
             cur_deck = filter(lambda x: not (x in dealt_cards), deck)
@@ -224,12 +229,31 @@ class GameTree(object):
         d = float(sum(x.values()))
         return zip(x.keys(),[y / d for y in x.values()])
 
+def multi_infoset_format(infoset_format, player, holecards, board, bet_history):
+        pass
+
 class PublicTree(GameTree):
     def __init__(self, players, deck, rounds, ante, blinds, handeval = HandEvaluator.evaluate_hand, infoset_format=default_infoset_format):
-        GameTree.__init__(players, deck, rounds, ante, blinds, handeval, infoset_format)
+        GameTree.__init__(players, deck, rounds, ante, blinds, handeval, partial(multi_infoset_format, infoset_format=infoset_format))
 
     def build_holecards(self, root, next_player, players_in, committed, holes, board, deck, bet_history, round_idx, min_actions_this_round, actions_this_round, bets):
-        pass
+        cur_round = self.roundinfo[round_idx]
+        hnode = HolecardChanceNode(root, committed, holes, board, self.deck, "", cur_round.holecards)
+        # Deal holecards
+        all_hc = self.deal_holecards(deck, cur_round.holecards, players_in.count(True))
+        for cur_holes in all_hc:
+            dealt_cards = ()
+            cur_holes = list(cur_holes)
+            cur_idx = 0
+            for i,hc in enumerate(holes):
+                if players_in[i]:
+                    cur_holes[cur_idx] = hc + cur_holes[cur_idx]
+                    cur_idx += 1
+        if cur_round.boardcards:
+            self.build_boardcards(hnode, next_player, players_in, committed, cur_holes, board, cur_deck, bet_history, round_idx, min_actions_this_round, actions_this_round, bets)
+        else:
+            self.build_bets(hnode, next_player, players_in, committed, cur_holes, board, cur_deck, bet_history, round_idx, min_actions_this_round, actions_this_round, bets)
+        return hnode
 
     def build_boardcards(self, root, next_player, players_in, committed, holes, board, deck, bet_history, round_idx, min_actions_this_round, actions_this_round, bets):
         pass
