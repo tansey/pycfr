@@ -1,5 +1,6 @@
 from itertools import combinations
 from itertools import permutations
+from itertools import product
 from collections import Counter
 from card import Card
 from hand_evaluator import HandEvaluator
@@ -25,7 +26,7 @@ def all_unique(hc):
     return True
 
 def default_infoset_format(player, holecards, board, bet_history):
-    return "{0}{1}:{2}:".format("".join([str(x) for x in holecards[player]]), "".join([str(x) for x in board]), bet_history)
+    return "{0}{1}:{2}:".format("".join([str(x) for x in holecards]), "".join([str(x) for x in board]), bet_history)
 
 class RoundInfo(object):
     def __init__(self, holecards, boardcards, betsize, maxbets):
@@ -206,7 +207,6 @@ class GameTree(object):
         if players_in.count(True) == 1:
             winners = [i for i,v in enumerate(players_in) if v]
         else:
-            handsize = len(holes[0]) + len(board)
             scores = [self.handeval(hc, board) for hc in holes]
             winners = []
             maxscore = -1
@@ -229,60 +229,98 @@ class GameTree(object):
         d = float(sum(x.values()))
         return zip(x.keys(),[y / d for y in x.values()])
 
-def multi_infoset_format(infoset_format, player, holecards, board, bet_history):
-        pass
+def multi_infoset_format(base_infoset_format, player, holecards, board, bet_history):
+    return tuple([base_infoset_format(player, hc, board, bet_history) for hc in holecards])
 
 class PublicTree(GameTree):
     def __init__(self, players, deck, rounds, ante, blinds, handeval = HandEvaluator.evaluate_hand, infoset_format=default_infoset_format):
-        GameTree.__init__(players, deck, rounds, ante, blinds, handeval, partial(multi_infoset_format, infoset_format=infoset_format))
+        GameTree.__init__(self, players, deck, rounds, ante, blinds, handeval, partial(multi_infoset_format, infoset_format))
 
     def build_holecards(self, root, next_player, players_in, committed, holes, board, deck, bet_history, round_idx, min_actions_this_round, actions_this_round, bets):
         cur_round = self.roundinfo[round_idx]
         hnode = HolecardChanceNode(root, committed, holes, board, self.deck, "", cur_round.holecards)
         # Deal holecards
-        all_hc = self.deal_holecards(deck, cur_round.holecards, players_in.count(True))
-        for cur_holes in all_hc:
-            dealt_cards = ()
-            cur_holes = list(cur_holes)
-            cur_idx = 0
-            for i,hc in enumerate(holes):
-                if players_in[i]:
-                    cur_holes[cur_idx] = hc + cur_holes[cur_idx]
-                    cur_idx += 1
+        all_hc = list(combinations(deck, cur_round.holecards))
+        updated_holes = []
+        for player in range(self.players):
+            if not players_in[player]:
+                # Only deal to players who are still in the hand
+                updated_holes.append([old_hc for old_hc in holes[player]])
+            elif len(holes[player]) == 0:
+                # If this player has no cards, just set their holecards to be the newly dealt ones
+                updated_holes.append([new_hc for new_hc in all_hc])
+            else:
+                updated_holes.append([])
+                # Filter holecards to valid combinations
+                for new_hc in all_hc:
+                    for old_hc in holes[player]:
+                        if not overlap(old_hc, new_hc):
+                            updated_holes[player].append(old_hc + new_hc)         
         if cur_round.boardcards:
-            self.build_boardcards(hnode, next_player, players_in, committed, cur_holes, board, cur_deck, bet_history, round_idx, min_actions_this_round, actions_this_round, bets)
+            self.build_boardcards(hnode, next_player, players_in, committed, updated_holes, board, deck, bet_history, round_idx, min_actions_this_round, actions_this_round, bets)
         else:
-            self.build_bets(hnode, next_player, players_in, committed, cur_holes, board, cur_deck, bet_history, round_idx, min_actions_this_round, actions_this_round, bets)
+            self.build_bets(hnode, next_player, players_in, committed, updated_holes, board, deck, bet_history, round_idx, min_actions_this_round, actions_this_round, bets)
         return hnode
 
     def build_boardcards(self, root, next_player, players_in, committed, holes, board, deck, bet_history, round_idx, min_actions_this_round, actions_this_round, bets):
-        pass
+        cur_round = self.roundinfo[round_idx]
+        bnode = BoardcardChanceNode(root, committed, holes, board, deck, bet_history, cur_round.boardcards)
+        all_bc = combinations(deck, cur_round.boardcards)
+        for bc in all_bc:
+            cur_board = board + bc
+            cur_deck = filter(lambda x: not (x in bc), deck)
+            updated_holes = []
+            # Filter any holecards that are now impossible
+            for player in range(self.players):
+                updated_holes.append([])
+                for hc in holes[player]:
+                    if not overlap(hc, bc):
+                        updated_holes[player].append(hc)
+            self.build_bets(bnode, next_player, players_in, committed, updated_holes, cur_board, cur_deck, bet_history, round_idx, min_actions_this_round, actions_this_round, bets)
+        return bnode
 
-    # infosets: [ infosets_0, infosets_1, ... ]
-    # infosets_i: { 'infoset_0': [state0, state1, ... ], 'infoset_1': [state0, state1, ... ], ... }
-    # reach_probs: [ reach_probs_0, reach_probs_1, ... ]
-    # reach_probs_i: { 'infoset_0': prob0 }
     def showdown(self, root, players_in, committed, holes, board, deck, bet_history):
-        """
-        payoffs = []
-        # for every player
-        for i in range(self.players):
-            player_payoffs = {}
-            # for every information set that the player may be in
-            for infoset in infosets[i]:
-                info_r = 0 # the reward for this info set
-                total_prob = 0 # the cumulative probability given opponent cards
-                # for every state in the information set
-                for state in infosets[i][infoset]:
-                    # the probability of opponents allowing you to reach this state
-                    reach_prob = get_reach_prob(reach_probs, state, i)
-                    info_r += state.payoffs[i] * reach_prob # add the reward for this state
-                    total_prob += reach_prob # add this probability to the total for this infoset
-                player_payoffs[infoset] = info_r / total_prob, set the normalized value for this infoset
-            payoffs.append(player_payoffs)
+        # TODO: Speedup
+        # - Pre-order list of hands
+        pot = sum(committed)
+        showdowns_possible = self.showdown_combinations(holes)
+        if players_in.count(True) == 1:
+            fold_payoffs = [-x for x in committed]
+            fold_payoffs[players_in.index(True)] += pot
+            payoffs = { hands: fold_payoffs for hands in showdowns_possible }
+        else:
+            scores = {}
+            for i in range(self.players):
+                if players_in[i]:
+                    for hc in holes[i]:
+                        if not (hc in scores):
+                            scores[hc] = self.handeval(hc, board)
+            payoffs = { hands: self.calc_payoffs(hands, scores, players_in, committed, pot) for hands in showdowns_possible }
+        return TerminalNode(root, committed, holes, board, deck, bet_history, payoffs)
+
+    def showdown_combinations(self, holes):
+        # Get all the possible holecard matchups for a given showdown.
+        # Every card must be unique because two players cannot have the same holecard.
+        return list(filter(lambda x: all_unique(x), product(*holes)))
+
+    def calc_payoffs(self, hands, scores, players_in, committed, pot):        
+        winners = []
+        maxscore = -1
+        for i,hand in enumerate(hands):
+            if players_in[i]:
+                s = scores[hand]
+                if len(winners) == 0 or s > maxscore:
+                    maxscore = s
+                    winners = [i]
+                elif s == maxscore:
+                    winners.append(i)
+        payoff = pot / float(len(winners))
+        payoffs = [-x for x in committed]
+        for w in winners:
+            payoffs[w] += payoff
         return payoffs
-        """
-        pass
+
+    
 
 class Node(object):
     def __init__(self, parent, committed, holecards, board, deck, bet_history):
@@ -326,7 +364,7 @@ class ActionNode(Node):
         self.raise_action = None
         self.call_action = None
         self.fold_action = None
-        self.player_view = infoset_format(player, holecards, board, bet_history)
+        self.player_view = infoset_format(player, holecards[player], board, bet_history)
 
     def valid(self, action):
         if action == FOLD:

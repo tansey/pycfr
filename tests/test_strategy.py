@@ -4,7 +4,9 @@ sys.path.insert(0,os.path.realpath('.'))
 from pokerstrategy import *
 from pokergames import *
 
-hskuhn_gametree = half_street_kuhn()
+print 'Testing Strategy'
+
+hskuhn_gametree = half_street_kuhn_gametree()
 
 s0 = Strategy(0)
 s0.policy = { 'A:/:': [0,0,1], 'K:/:': [0,1,0], 'Q:/:': [0,2.0/3.0,1.0/3.0] }
@@ -27,7 +29,7 @@ print "Eq0 vs. Nash1: {0}".format(StrategyProfile(hskuhn_gametree, [eq0,s1]).exp
 print "Eq0 vs. Eq1: {0}".format(StrategyProfile(hskuhn_gametree, [eq0,eq1]).expected_value())
 print ""
 
-leduc_gametree = leduc()
+leduc_gt = leduc_gametree()
 
 s0 = Strategy(0)
 s0.load_from_file('strategies/leduc/0.strat')
@@ -47,13 +49,13 @@ assert(len(s1.policy) == 144)
 
 # Generate a default strategy for player 0
 eq0 = Strategy(0)
-eq0.build_default(leduc_gametree)
+eq0.build_default(leduc_gt)
 eq0.save_to_file('tests/leduc_eq0.strat')
 assert(len(eq0.policy) == 144)
 
 # Generate a default strategy for player 1
 eq1 = Strategy(1)
-eq1.build_default(leduc_gametree)
+eq1.build_default(leduc_gt)
 eq1.save_to_file('tests/leduc_eq1.strat')
 assert(len(eq1.policy) == 144)
 
@@ -66,27 +68,27 @@ rand1.load_from_file('strategies/leduc/random.strat')
 All leduc test values were derived using the open_cfr implementation from UoAlberta
 """
 print "Leduc"
-result = StrategyProfile(leduc_gametree, [s0,s1]).expected_value()
+result = StrategyProfile(leduc_gt, [s0,s1]).expected_value()
 print "Nash0 vs. Nash1 EV: {0}".format(result)
 assert(result[0] >= -0.085653 and result[0] <= -0.085651)
 
-result = StrategyProfile(leduc_gametree, [s0,eq1]).expected_value()
+result = StrategyProfile(leduc_gt, [s0,eq1]).expected_value()
 print "Nash0 vs. Eq1 EV: {0}".format(result)
 assert(result[0] >= 0.59143 and result[0] <= 0.59145)
 
-result = StrategyProfile(leduc_gametree, [eq0,eq1]).expected_value()
+result = StrategyProfile(leduc_gt, [eq0,eq1]).expected_value()
 print "Eq0 vs. Eq1: {0}".format(result)
 assert(result[0] >= -0.078126 and result[0] <= -0.078124)
 
-result = StrategyProfile(leduc_gametree, [eq0,s1]).expected_value()
+result = StrategyProfile(leduc_gt, [eq0,s1]).expected_value()
 print "Eq0 vs. Nash1 EV: {0}".format(result)
 assert(result[0] >= -0.840442 and result[0] <= -0.840440)
 
-result = StrategyProfile(leduc_gametree, [s0,rand1]).expected_value()
+result = StrategyProfile(leduc_gt, [s0,rand1]).expected_value()
 print "Nash0 vs. Random: {0}".format(result)
 assert(result[0] >= 0.591873 and result[0] <= 0.591875)
 
-result = StrategyProfile(leduc_gametree, [rand0,s1]).expected_value()
+result = StrategyProfile(leduc_gt, [rand0,s1]).expected_value()
 print "Random vs. Nash1: {0}".format(result)
 assert(result[0] >= -0.84791 and result[0] <= -0.84790)
 

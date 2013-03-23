@@ -92,6 +92,25 @@ class StrategyProfile(object):
 
     def br_helper(self, root, pathprob, response_player):
         if type(root) is TerminalNode:
+            """
+            payoffs = []
+            # for every player
+            for i in range(self.players):
+                player_payoffs = {}
+                # for every information set that the player may be in
+                for infoset in infosets[i]:
+                    info_r = 0 # the reward for this info set
+                    total_prob = 0 # the cumulative probability given opponent cards
+                    # for every state in the information set
+                    for state in infosets[i][infoset]:
+                        # the probability of opponents allowing you to reach this state
+                        reach_prob = get_reach_prob(reach_probs, state, i)
+                        info_r += state.payoffs[i] * reach_prob # add the reward for this state
+                        total_prob += reach_prob # add this probability to the total for this infoset
+                    player_payoffs[infoset] = info_r / total_prob, set the normalized value for this infoset
+                payoffs.append(player_payoffs)
+            return payoffs
+            """
             return root.payoffs
         if type(root) is HolecardChanceNode or type(root) is BoardcardChanceNode:
             pass
@@ -99,6 +118,6 @@ class StrategyProfile(object):
         if root.player != response_player:
             pass
         # It's an ActionNode for the response player
-        
+
 
 
