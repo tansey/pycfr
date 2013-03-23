@@ -54,7 +54,7 @@ class StrategyProfile(object):
         """
         return self.ev_helper(self.gametree.root, 1)
 
-    def ev_helper(self, root, pathprob, depth = 0):
+    def ev_helper(self, root, pathprob):
         if type(root) is TerminalNode:
             payoffs = [x*pathprob for x in root.payoffs]
             return payoffs
@@ -62,7 +62,7 @@ class StrategyProfile(object):
             payoffs = [0] * self.gametree.players
             prob = pathprob / float(len(root.children))
             for child in root.children:
-                subpayoffs = self.ev_helper(child, prob, depth+1)
+                subpayoffs = self.ev_helper(child, prob)
                 for i,p in enumerate(subpayoffs):
                     payoffs[i] += p
             return payoffs
@@ -70,15 +70,15 @@ class StrategyProfile(object):
         probs = self.strategies[root.player].probs(root.player_view)
         payoffs = [0] * self.gametree.players
         if root.fold_action and probs[FOLD] > 0.0000000001:
-            subpayoffs = self.ev_helper(root.fold_action, pathprob * probs[FOLD], depth+1)
+            subpayoffs = self.ev_helper(root.fold_action, pathprob * probs[FOLD])
             for i,p in enumerate(subpayoffs):
                 payoffs[i] += p
         if root.call_action and probs[CALL] > 0.0000000001:
-            subpayoffs = self.ev_helper(root.call_action, pathprob * probs[CALL], depth+1)
+            subpayoffs = self.ev_helper(root.call_action, pathprob * probs[CALL])
             for i,p in enumerate(subpayoffs):
                 payoffs[i] += p
         if root.raise_action and probs[RAISE] > 0.0000000001:
-            subpayoffs = self.ev_helper(root.raise_action, pathprob * probs[RAISE], depth+1)
+            subpayoffs = self.ev_helper(root.raise_action, pathprob * probs[RAISE])
             for i,p in enumerate(subpayoffs):
                 payoffs[i] += p
         return payoffs
@@ -88,5 +88,17 @@ class StrategyProfile(object):
         Calculates the best response of the given player to the strategy profile.
         Returns the best response strategy.
         """
-        pass
+        return self.br_helper(self.gametree.root, 1, player)
+
+    def br_helper(self, root, pathprob, response_player):
+        if type(root) is TerminalNode:
+            return root.payoffs
+        if type(root) is HolecardChanceNode or type(root) is BoardcardChanceNode:
+            pass
+        # It's an ActionNode for an opponent
+        if root.player != response_player:
+            pass
+        # It's an ActionNode for the response player
+        
+
 

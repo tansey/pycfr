@@ -21,7 +21,6 @@ eq1.build_default(hskuhn_gametree)
 eq1.save_to_file('tests/hskuhn_eq1.strat')
 
 print "Half-Street Kuhn"
-print "Holecards: {0}".format(hskuhn_gametree.deal_holecards())
 print "Nash0 vs. Nash1: {0}".format(StrategyProfile(hskuhn_gametree, [s0,s1]).expected_value())
 print "Nash0 vs. Eq1: {0}".format(StrategyProfile(hskuhn_gametree, [s0,eq1]).expected_value())
 print "Eq0 vs. Nash1: {0}".format(StrategyProfile(hskuhn_gametree, [eq0,s1]).expected_value())

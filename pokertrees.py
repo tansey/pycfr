@@ -27,13 +27,14 @@ def default_infoset_format(player, holecards, board, bet_history):
     return "{0}{1}:{2}:".format("".join([str(x) for x in holecards[player]]), "".join([str(x) for x in board]), bet_history)
 
 class RoundInfo(object):
-    def __init__(self, boardcards, betsize, maxbets):
+    def __init__(self, holecards, boardcards, betsize, maxbets):
+        self.holecards = holecards
         self.boardcards = boardcards
         self.betsize = betsize
         self.maxbets = maxbets
 
 class GameTree(object):
-    def __init__(self, players, deck, holecards, rounds, ante, blinds, handeval = HandEvaluator.evaluate_hand, infoset_format=default_infoset_format):
+    def __init__(self, players, deck, rounds, ante, blinds, handeval = HandEvaluator.evaluate_hand, infoset_format=default_infoset_format):
         assert(players >= 2)
         assert(ante >= 0)
         assert(rounds != None)
@@ -47,7 +48,6 @@ class GameTree(object):
             assert(len(r.maxbets) == players)
         self.players = players
         self.deck = deck
-        self.holecards = holecards
         self.roundinfo = rounds
         self.ante = ante
         self.blinds = blinds
@@ -60,55 +60,78 @@ class GameTree(object):
         players_in = [True] * self.players
         # Collect antes
         committed = [self.ante] * self.players
-        next_player = 0
         bets = [0] * self.players
         # Collect blinds
+        next_player = self.collect_blinds(committed, bets, 0)
+        holes = [()] * self.players
+        board = ()
+        bet_history = ""
+        self.root = self.build_rounds(None, players_in, committed, holes, board, self.deck, bet_history, 0, bets, next_player)
+
+    def collect_blinds(self, committed, bets, next_player):
         if self.blinds != None:
             for blind in self.blinds:
                 committed[next_player] += blind
                 bets[next_player] = int((committed[next_player] - self.ante) / self.roundinfo[0].betsize)
                 next_player = (next_player + 1) % self.players
-        holes = [[]] * self.players
-        board = ()
-        self.root = HolecardChanceNode(None, committed, holes, board, self.deck, "", self.holecards)
-        # Deal holecards
-        all_hc = self.deal_holecards()
-        # Create a child node for every possible distribution
-        for hc in all_hc:
-            cur_holes = hc
-            f = ()
-            for c in cur_holes:
-                f = f + c
-            cur_deck = filter(lambda x: not (x in f), self.deck)
-            self.build_rounds(self.root, players_in, committed, cur_holes, board, cur_deck, "", 0, bets, next_player)
+        return next_player
 
-    def deal_holecards(self):
-        a = combinations(self.deck, self.holecards)
+    def deal_holecards(self, deck, holecards):
+        a = combinations(deck, holecards)
         return filter(lambda x: all_unique(x), permutations(a, self.players))
 
     def build_rounds(self, root, players_in, committed, holes, board, deck, bet_history, round_idx, bets = None, next_player = 0):
         if round_idx == len(self.roundinfo):
-            self.showdown(root, players_in, committed, holes, board, deck, bet_history)
-            return
+            return self.showdown(root, players_in, committed, holes, board, deck, bet_history)
         bet_history += "/"
         cur_round = self.roundinfo[round_idx]
         while not players_in[next_player]:
             next_player = (next_player + 1) % self.players
+        if bets is None:
+            bets = [0] * self.players
+        min_actions_this_round = players_in.count(True)
+        actions_this_round = 0
+        if cur_round.holecards:
+            return self.build_holecards(root, next_player, players_in, committed, holes, board, deck, bet_history, round_idx, min_actions_this_round, actions_this_round, bets)
         if cur_round.boardcards:
-            self.deal_boardcards(root, next_player, players_in, committed, holes, board, deck, bet_history, round_idx)
-        else:
-            if bets is None:
-                bets = [0] * self.players
-            self.build_bets(root, next_player, players_in, committed, holes, board, deck, bet_history, round_idx, players_in.count(True), 0, bets)
+            return self.build_boardcards(root, next_player, players_in, committed, holes, board, deck, bet_history, round_idx, min_actions_this_round, actions_this_round, bets)
+        return self.build_bets(root, next_player, players_in, committed, holes, board, deck, bet_history, round_idx, min_actions_this_round, actions_this_round, bets)
 
-    def deal_boardcards(self, root, next_player, players_in, committed, holes, board, deck, bet_history, round_idx):
+    def get_next_player(self, cur_player, players_in):
+        next_player = (cur_player + 1) % self.players
+        while not players_in[next_player]:
+            next_player = (next_player + 1) % self.players
+        return next_player
+
+    def build_holecards(self, root, next_player, players_in, committed, holes, board, deck, bet_history, round_idx, min_actions_this_round, actions_this_round, bets):
+        cur_round = self.roundinfo[round_idx]
+        hnode = HolecardChanceNode(root, committed, holes, board, self.deck, "", cur_round.holecards)
+        # Deal holecards
+        all_hc = self.deal_holecards(deck, cur_round.holecards)
+        # Create a child node for every possible distribution
+        for cur_holes in all_hc:
+            dealt_cards = ()
+            cur_holes = list(cur_holes)
+            for i,hc in enumerate(holes):
+                cur_holes[i] = hc + cur_holes[i]
+            for hc in cur_holes:
+                dealt_cards += hc
+            cur_deck = filter(lambda x: not (x in dealt_cards), deck)
+            if cur_round.boardcards:
+                self.build_boardcards(hnode, next_player, players_in, committed, cur_holes, board, cur_deck, bet_history, round_idx, min_actions_this_round, actions_this_round, bets)
+            else:
+                self.build_bets(hnode, next_player, players_in, committed, cur_holes, board, cur_deck, bet_history, round_idx, min_actions_this_round, actions_this_round, bets)
+        return hnode
+
+    def build_boardcards(self, root, next_player, players_in, committed, holes, board, deck, bet_history, round_idx, min_actions_this_round, actions_this_round, bets):
         cur_round = self.roundinfo[round_idx]
         bnode = BoardcardChanceNode(root, committed, holes, board, deck, bet_history, cur_round.boardcards)
         all_bc = combinations(deck, cur_round.boardcards)
         for bc in all_bc:
             cur_board = board + bc
             cur_deck = filter(lambda x: not (x in bc), deck)
-            self.build_bets(bnode, next_player, players_in, committed, holes, cur_board, cur_deck, bet_history, round_idx, players_in.count(True), 0, [0] * self.players)
+            self.build_bets(bnode, next_player, players_in, committed, holes, cur_board, cur_deck, bet_history, round_idx, min_actions_this_round, actions_this_round, bets)
+        return bnode
 
     def build_bets(self, root, next_player, players_in, committed, holes, board, deck, bet_history, round_idx, min_actions_this_round, actions_this_round, bets_this_round):
         # if everyone else folded, end the hand
@@ -126,9 +149,7 @@ class GameTree(object):
             self.information_sets[anode.player_view] = []
         self.information_sets[anode.player_view].append(anode)
         # get the next player to act
-        next_player = (next_player + 1) % self.players
-        while not players_in[next_player]:
-            next_player = (next_player + 1) % self.players
+        next_player = self.get_next_player(next_player, players_in)
         # add a folding option if someone has bet more than this player
         if committed[anode.player] < max(committed):
             self.add_fold_child(anode, next_player, players_in, committed, holes, board, deck, bet_history, round_idx, min_actions_this_round, actions_this_round, bets_this_round)
@@ -137,6 +158,7 @@ class GameTree(object):
         # add a raising option if this player has not reached their max bet level
         if cur_round.maxbets[anode.player] > max(bets_this_round):
             self.add_raise_child(anode, next_player, players_in, committed, holes, board, deck, bet_history, round_idx, min_actions_this_round, actions_this_round, bets_this_round)
+        return anode
 
     def all_called_last_raisor_or_folded(self, players_in, bets):
         betlevel = max(bets)
@@ -195,12 +217,48 @@ class GameTree(object):
         payoffs = [-x for x in committed]
         for w in winners:
             payoffs[w] += payoff
-        TerminalNode(root, committed, holes, board, deck, bet_history, payoffs)
+        return TerminalNode(root, committed, holes, board, deck, bet_history, payoffs)
 
     def holecard_distributions(self):
         x = Counter(combinations(self.deck, self.holecards))
         d = float(sum(x.values()))
         return zip(x.keys(),[y / d for y in x.values()])
+
+class PublicTree(GameTree):
+    def __init__(self, players, deck, rounds, ante, blinds, handeval = HandEvaluator.evaluate_hand, infoset_format=default_infoset_format):
+        GameTree.__init__(players, deck, rounds, ante, blinds, handeval, infoset_format)
+
+    def build_holecards(self, root, next_player, players_in, committed, holes, board, deck, bet_history, round_idx, min_actions_this_round, actions_this_round, bets):
+        pass
+
+    def build_boardcards(self, root, next_player, players_in, committed, holes, board, deck, bet_history, round_idx, min_actions_this_round, actions_this_round, bets):
+        pass
+
+    # infosets: [ infosets_0, infosets_1, ... ]
+    # infosets_i: { 'infoset_0': [state0, state1, ... ], 'infoset_1': [state0, state1, ... ], ... }
+    # reach_probs: [ reach_probs_0, reach_probs_1, ... ]
+    # reach_probs_i: { 'infoset_0': prob0 }
+    def showdown(self, root, players_in, committed, holes, board, deck, bet_history):
+        """
+        payoffs = []
+        # for every player
+        for i in range(self.players):
+            player_payoffs = {}
+            # for every information set that the player may be in
+            for infoset in infosets[i]:
+                info_r = 0 # the reward for this info set
+                total_prob = 0 # the cumulative probability given opponent cards
+                # for every state in the information set
+                for state in infosets[i][infoset]:
+                    # the probability of opponents allowing you to reach this state
+                    reach_prob = get_reach_prob(reach_probs, state, i)
+                    info_r += state.payoffs[i] * reach_prob # add the reward for this state
+                    total_prob += reach_prob # add this probability to the total for this infoset
+                player_payoffs[infoset] = info_r / total_prob, set the normalized value for this infoset
+            payoffs.append(player_payoffs)
+        return payoffs
+        """
+        pass
 
 class Node(object):
     def __init__(self, parent, committed, holecards, board, deck, bet_history):

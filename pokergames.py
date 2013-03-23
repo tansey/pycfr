@@ -6,22 +6,20 @@ def kuhn_eval(hc, board):
 def half_street_kuhn():
     players = 2
     deck = [Card(14,1),Card(13,1),Card(12,1)]
-    holecards = 1
     ante = 1
     blinds = None
-    rounds = [RoundInfo(boardcards=0,betsize=1,maxbets=[1,0])]
-    tree = GameTree(players, deck, holecards, rounds, ante, blinds, handeval=kuhn_eval, infoset_format=leduc_format)
+    rounds = [RoundInfo(holecards=1,boardcards=0,betsize=1,maxbets=[1,0])]
+    tree = GameTree(players, deck, rounds, ante, blinds, handeval=kuhn_eval, infoset_format=leduc_format)
     tree.build()
     return tree
 
 def kuhn():
     players = 2
     deck = [Card(14,1),Card(13,1),Card(12,1)]
-    holecards = 1
     ante = 1
     blinds = None
-    rounds = [RoundInfo(boardcards=0,betsize=1,maxbets=[1,1])]
-    tree = GameTree(players, deck, holecards, rounds, ante, blinds, handeval=kuhn_eval, infoset_format=leduc_format)
+    rounds = [RoundInfo(holecards=1,boardcards=0,betsize=1,maxbets=[1,1])]
+    tree = GameTree(players, deck, rounds, ante, blinds, handeval=kuhn_eval, infoset_format=leduc_format)
     tree.build()
     return tree
 
@@ -40,10 +38,9 @@ def leduc_eval(hc,board):
 def leduc():
     players = 2
     deck = [Card(13,1),Card(13,2),Card(12,1),Card(12,2),Card(11,1),Card(11,2)]
-    holecards = 1
     ante = 1
     blinds = None
-    rounds = [RoundInfo(boardcards=0,betsize=2,maxbets=[2,2]),RoundInfo(boardcards=1,betsize=4,maxbets=[2,2])]
-    tree = GameTree(players, deck, holecards, rounds, ante, blinds, handeval=leduc_eval, infoset_format=leduc_format)
+    rounds = [RoundInfo(holecards=1,boardcards=0,betsize=2,maxbets=[2,2]),RoundInfo(holecards=0,boardcards=1,betsize=4,maxbets=[2,2])]
+    tree = GameTree(players, deck, rounds, ante, blinds, handeval=leduc_eval, infoset_format=leduc_format)
     tree.build()
     return tree
