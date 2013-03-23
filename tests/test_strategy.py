@@ -6,6 +6,7 @@ from pokergames import *
 
 print 'Testing Strategy'
 
+hskuhn_rules = half_street_kuhn_rules()
 hskuhn_gametree = half_street_kuhn_gametree()
 
 s0 = Strategy(0)
@@ -23,12 +24,13 @@ eq1.build_default(hskuhn_gametree)
 eq1.save_to_file('tests/hskuhn_eq1.strat')
 
 print "Half-Street Kuhn"
-print "Nash0 vs. Nash1: {0}".format(StrategyProfile(hskuhn_gametree, [s0,s1]).expected_value())
-print "Nash0 vs. Eq1: {0}".format(StrategyProfile(hskuhn_gametree, [s0,eq1]).expected_value())
-print "Eq0 vs. Nash1: {0}".format(StrategyProfile(hskuhn_gametree, [eq0,s1]).expected_value())
-print "Eq0 vs. Eq1: {0}".format(StrategyProfile(hskuhn_gametree, [eq0,eq1]).expected_value())
+print "Nash0 vs. Nash1: {0}".format(StrategyProfile(hskuhn_rules, [s0,s1]).expected_value())
+print "Nash0 vs. Eq1: {0}".format(StrategyProfile(hskuhn_rules, [s0,eq1]).expected_value())
+print "Eq0 vs. Nash1: {0}".format(StrategyProfile(hskuhn_rules, [eq0,s1]).expected_value())
+print "Eq0 vs. Eq1: {0}".format(StrategyProfile(hskuhn_rules, [eq0,eq1]).expected_value())
 print ""
 
+leduc_rules = leduc_rules()
 leduc_gt = leduc_gametree()
 
 s0 = Strategy(0)
@@ -68,27 +70,39 @@ rand1.load_from_file('strategies/leduc/random.strat')
 All leduc test values were derived using the open_cfr implementation from UoAlberta
 """
 print "Leduc"
-result = StrategyProfile(leduc_gt, [s0,s1]).expected_value()
+profile = StrategyProfile(leduc_rules, [s0,s1])
+profile.gametree = leduc_gt
+result = profile.expected_value()
 print "Nash0 vs. Nash1 EV: {0}".format(result)
 assert(result[0] >= -0.085653 and result[0] <= -0.085651)
 
-result = StrategyProfile(leduc_gt, [s0,eq1]).expected_value()
+profile = StrategyProfile(leduc_rules, [s0,eq1])
+profile.gametree = leduc_gt
+result = profile.expected_value()
 print "Nash0 vs. Eq1 EV: {0}".format(result)
 assert(result[0] >= 0.59143 and result[0] <= 0.59145)
 
-result = StrategyProfile(leduc_gt, [eq0,eq1]).expected_value()
+profile = StrategyProfile(leduc_rules, [eq0,eq1])
+profile.gametree = leduc_gt
+result = profile.expected_value()
 print "Eq0 vs. Eq1: {0}".format(result)
 assert(result[0] >= -0.078126 and result[0] <= -0.078124)
 
-result = StrategyProfile(leduc_gt, [eq0,s1]).expected_value()
+profile = StrategyProfile(leduc_rules, [eq0,s1])
+profile.gametree = leduc_gt
+result = profile.expected_value()
 print "Eq0 vs. Nash1 EV: {0}".format(result)
 assert(result[0] >= -0.840442 and result[0] <= -0.840440)
 
-result = StrategyProfile(leduc_gt, [s0,rand1]).expected_value()
+profile = StrategyProfile(leduc_rules, [s0,rand1])
+profile.gametree = leduc_gt
+result = profile.expected_value()
 print "Nash0 vs. Random: {0}".format(result)
 assert(result[0] >= 0.591873 and result[0] <= 0.591875)
 
-result = StrategyProfile(leduc_gt, [rand0,s1]).expected_value()
+profile = StrategyProfile(leduc_rules, [rand0,s1])
+profile.gametree = leduc_gt
+result = profile.expected_value()
 print "Random vs. Nash1: {0}".format(result)
 assert(result[0] >= -0.84791 and result[0] <= -0.84790)
 

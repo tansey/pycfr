@@ -5,12 +5,8 @@ from pokertrees import *
 from pokergames import *
 
 print 'Testing GameTree'
-players = 2
-deck = [Card(14,1),Card(13,2),Card(13,1),Card(12,1)]
-rounds = [RoundInfo(holecards=1,boardcards=0,betsize=1,maxbets=[2,2]),RoundInfo(holecards=0,boardcards=1,betsize=2,maxbets=[2,2])]
-ante = 1
-blinds = [1,2]
-tree = GameTree(players, deck, rounds, ante, blinds, handeval=leduc_eval)
+rules = GameRules(players = 2, deck = [Card(14,1),Card(13,2),Card(13,1),Card(12,1)], rounds = [RoundInfo(holecards=1,boardcards=0,betsize=1,maxbets=[2,2]),RoundInfo(holecards=0,boardcards=1,betsize=2,maxbets=[2,2])], ante = 1, blinds = [1,2], handeval=leduc_eval)
+tree = GameTree(rules)
 tree.build()
 assert(type(tree.root) == HolecardChanceNode)
 assert(len(tree.root.children) == 12)
@@ -95,7 +91,7 @@ assert(tree.root.children[0].children[1].children[0].children[0].children[0].chi
 print 'All passed!'
 
 print 'Testing PublicTree'
-tree = PublicTree(players, deck, rounds, ante, blinds, handeval=leduc_eval)
+tree = PublicTree(rules)
 tree.build()
 
 assert(type(tree.root) == HolecardChanceNode)

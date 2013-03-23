@@ -42,16 +42,22 @@ class Strategy(object):
         f.close()
 
 class StrategyProfile(object):
-    def __init__(self, gametree, strategies):
-        assert(gametree.players == len(strategies))
-        self.gametree = gametree
+    def __init__(self, rules, strategies):
+        assert(rules.players == len(strategies))
+        self.rules = rules
         self.strategies = strategies
+        self.gametree = None
+        self.publictree = None
 
     def expected_value(self):
         """
         Calculates the expected value of each strategy in the profile.
         Returns an array of scalars corresponding to the expected payoffs.
         """
+        if self.gametree is None:
+            self.gametree = GameTree(self.rules)
+        if self.gametree.root is None:
+            self.gametree.build()
         return self.ev_helper(self.gametree.root, 1)
 
     def ev_helper(self, root, pathprob):
@@ -59,7 +65,7 @@ class StrategyProfile(object):
             payoffs = [x*pathprob for x in root.payoffs]
             return payoffs
         if type(root) is HolecardChanceNode or type(root) is BoardcardChanceNode:
-            payoffs = [0] * self.gametree.players
+            payoffs = [0] * self.rules.players
             prob = pathprob / float(len(root.children))
             for child in root.children:
                 subpayoffs = self.ev_helper(child, prob)
@@ -68,7 +74,7 @@ class StrategyProfile(object):
             return payoffs
         # Otherwise, it's an ActionNode
         probs = self.strategies[root.player].probs(root.player_view)
-        payoffs = [0] * self.gametree.players
+        payoffs = [0] * self.rules.players
         if root.fold_action and probs[FOLD] > 0.0000000001:
             subpayoffs = self.ev_helper(root.fold_action, pathprob * probs[FOLD])
             for i,p in enumerate(subpayoffs):
@@ -88,6 +94,10 @@ class StrategyProfile(object):
         Calculates the best response of the given player to the strategy profile.
         Returns the best response strategy.
         """
+        if self.publictree is None:
+            self.publictree = PublicTree(self.rules)
+        if self.publictree.root is None:
+            self.publictree.build()
         return self.br_helper(self.gametree.root, 1, player)
 
     def br_helper(self, root, pathprob, response_player):

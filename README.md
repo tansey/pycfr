@@ -17,7 +17,8 @@ deck = [Card(14,1),Card(13,2),Card(13,1),Card(12,1)]
 rounds = [RoundInfo(holecards=1,boardcards=0,betsize=2,maxbets=[2,2]),RoundInfo(holecards=0,boardcards=1,betsize=4,maxbets=[2,2])]
 ante = 1
 blinds = [1,2]
-gametree = GameTree(players, deck, rounds, ante, blinds, handeval=leduc_eval)
+gamerules = GameRules(players, deck, rounds, ante, blinds, handeval=leduc_eval)
+gametree = GameTree(gamerules)
 gametree.build()
 ```
 
@@ -33,7 +34,10 @@ Evaluating a strategy profile
 You can calculate the expected value of a set of strategies for a game:
 
 ```python
-gametree = leduc()
+from pokertrees import *
+from pokergames import *
+from pokerstrategy import *
+rules = leduc_rules()
 
 # load first player strategy
 s0 = Strategy(0)
@@ -44,7 +48,7 @@ s1 = Strategy(1)
 s1.load_from_file('strategies/leduc/1.strat')
 
 # Create a strategy profile for this game
-profile = StrategyProfile(gametree, [s0,s1])
+profile = StrategyProfile(rules, [s0,s1])
 
 ev = profile.expected_value()
 ```
