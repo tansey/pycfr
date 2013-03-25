@@ -92,42 +92,125 @@ class StrategyProfile(object):
     def best_response(self, player):
         """
         Calculates the best response of the given player to the strategy profile.
-        Returns the best response strategy.
+        Returns a tuple of the best response strategy and its expected value.
+        TODO: Extend this to calculate best response of all players simultaneously.
         """
         if self.publictree is None:
             self.publictree = PublicTree(self.rules)
         if self.publictree.root is None:
             self.publictree.build()
-        return self.br_helper(self.gametree.root, 1, player)
+        response = Strategy(player)
+        ev = sum(self.br_helper(self.publictree.root, [{(): 1} for _ in range(self.rules.players)], response))
+        return (response, ev)
 
-    def br_helper(self, root, pathprob, response_player):
+    def br_helper(self, root, reachprobs, response):
         if type(root) is TerminalNode:
-            """
-            payoffs = []
-            # for every player
-            for i in range(self.players):
-                player_payoffs = {}
-                # for every information set that the player may be in
-                for infoset in infosets[i]:
-                    info_r = 0 # the reward for this info set
-                    total_prob = 0 # the cumulative probability given opponent cards
-                    # for every state in the information set
-                    for state in infosets[i][infoset]:
-                        # the probability of opponents allowing you to reach this state
-                        reach_prob = get_reach_prob(reach_probs, state, i)
-                        info_r += state.payoffs[i] * reach_prob # add the reward for this state
-                        total_prob += reach_prob # add this probability to the total for this infoset
-                    player_payoffs[infoset] = info_r / total_prob, set the normalized value for this infoset
-                payoffs.append(player_payoffs)
+            payoffs = [0 for _ in root.holecards[response.player]]
+            print 'Bet history: {0}'.format(root.bet_history)
+            for showdown in root.payoffs:
+                prob = 1
+                print '\tShowdown: {0}'.format(showdown)
+                for i,hc in enumerate(showdown):
+                    print '\t\tPlayer: {0} HC: {1} Reachprobs: {2}'.format(i,hc,reachprobs[i])
+                    prob *= reachprobs[i][hc]
+                print '\tShowdown prob: {0}'.format(prob)
+                hc_idx = root.holecards[response.player].index(showdown[response.player])
+                print '\thc_idx: {0}'.format(hc_idx)
+                payoffs[hc_idx] += prob * root.payoffs[showdown][response.player]
+            print 'Payoffs for player {0}: {1}'.format(response.player, payoffs)
             return payoffs
-            """
-            return root.payoffs
-        if type(root) is HolecardChanceNode or type(root) is BoardcardChanceNode:
-            pass
+        if type(root) is HolecardChanceNode:
+            assert(len(root.children) == 1)
+            next_reachprobs = []
+            for player in range(self.rules.players):
+                next_player_reachprobs = {}
+                for hc in root.children[0].holecards[player]:
+                    prevlen = len(hc) - root.todeal
+                    next_player_reachprobs[hc] = reachprobs[player][hc[0:prevlen]] / float(self.choose(len(root.deck) - prevlen,root.todeal))
+                next_reachprobs.append(next_player_reachprobs)
+            return self.br_helper(root.children[0], next_reachprobs, response)
+        if type(root) is BoardcardChanceNode:
+            payoffs = [0 for _ in root.holecards[response.player]]
+            for bc in root.children:
+                subpayoffs = self.br_helper(bc, reachprobs, response)
+                for i,v in enumerate(subpayoffs):
+                    payoffs[i] += v
+            return payoffs
         # It's an ActionNode for an opponent
-        if root.player != response_player:
-            pass
+        if root.player != response.player:
+            strategy = self.strategies[root.player]
+            actionprobs = {}
+            for hc in root.holecards[root.player]:
+                infoset = self.rules.infoset_format(root.player, hc, root.board, root.bet_history)
+                actionprobs[hc] = strategy.probs(infoset)
+            payoffs = [0 for _ in root.holecards[response.player]]
+            if root.fold_action:
+                self.br_opponent_action(root, reachprobs, actionprobs, response, FOLD, payoffs)
+            if root.call_action:
+                self.br_opponent_action(root, reachprobs, actionprobs, response, CALL, payoffs)
+            if root.raise_action:
+                self.br_opponent_action(root, reachprobs, actionprobs, response, RAISE, payoffs)
+            return payoffs
         # It's an ActionNode for the response player
+        action_payoffs = [None, None, None]
+        if root.fold_action:
+            action_payoffs[FOLD] = self.br_helper(root.fold_action, reachprobs, response)
+        if root.call_action:
+            action_payoffs[CALL] = self.br_helper(root.call_action, reachprobs, response)
+        if root.raise_action:
+            action_payoffs[RAISE] = self.br_helper(root.raise_action, reachprobs, response)
+        payoffs = []
+        for i,hc in enumerate(root.holecards[root.player]):
+            infoset = self.rules.infoset_format(root.player, hc, root.board, root.bet_history)
+            maxv = None
+            max_actions = None
+            if root.fold_action:
+                maxv = action_payoffs[FOLD][i]
+                max_actions = [FOLD]
+            if root.call_action and (maxv is None or action_payoffs[CALL][i] >= maxv):
+                if maxv is None or action_payoffs[CALL][i] > maxv:
+                    maxv = action_payoffs[CALL][i]
+                    max_actions = [CALL]
+                else:
+                    max_actions.append(CALL)
+            if root.raise_action and (maxv is None or action_payoffs[RAISE][i] >= maxv):
+                if maxv is None or action_payoffs[RAISE][i] > maxv:
+                    maxv = action_payoffs[RAISE][i]
+                    max_actions = [RAISE]
+                else:
+                    max_actions.append(RAISE)
+            action_probs = [0,0,0]
+            for action in max_actions:
+                action_probs[action] = 1.0 / len(max_actions)
+            response.policy[infoset] = action_probs
+            payoffs.append(maxv)
+        return payoffs
 
+    def br_opponent_action(self, root, reachprobs, actionprobs, response, action, payoffs):
+        next_reachprobs = deepcopy(reachprobs)
+        next_reachprobs[root.player] = { hc: reachprobs[root.player][hc] * actionprobs[hc][action] for hc in root.holecards[root.player] }
+        if action == FOLD:
+            child = root.fold_action
+        elif action == CALL:
+            child = root.call_action
+        else:
+            child = root.raise_action
+        subpayoffs = self.br_helper(child, next_reachprobs, response)
+        for i,v in enumerate(subpayoffs):
+            payoffs[i] += v
 
+    def choose(self, n, k):
+        """
+        A fast way to calculate binomial coefficients by Andrew Dalke (contrib).
+        """
+        if 0 <= k <= n:
+            ntok = 1
+            ktok = 1
+            for t in xrange(1, min(k, n - k) + 1):
+                ntok *= n
+                ktok *= t
+                n -= 1
+            return ntok // ktok
+        else:
+            return 0
 

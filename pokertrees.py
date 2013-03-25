@@ -7,7 +7,6 @@ from hand_evaluator import HandEvaluator
 from copy import deepcopy
 from functools import partial
 
-CHANCE_PLAYER = -1
 FOLD = 0
 CALL = 1
 RAISE = 2
@@ -257,6 +256,7 @@ class PublicTree(GameTree):
             else:
                 updated_holes.append([])
                 # Filter holecards to valid combinations
+                # TODO: Speed this up by removing duplicate holecard combinations
                 for new_hc in all_hc:
                     for old_hc in holes[player]:
                         if not overlap(old_hc, new_hc):
@@ -323,9 +323,7 @@ class PublicTree(GameTree):
         payoffs = [-x for x in committed]
         for w in winners:
             payoffs[w] += payoff
-        return payoffs
-
-    
+        return payoffs    
 
 class Node(object):
     def __init__(self, parent, committed, holecards, board, deck, bet_history):

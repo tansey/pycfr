@@ -23,12 +23,29 @@ eq1 = Strategy(1)
 eq1.build_default(hskuhn_gametree)
 eq1.save_to_file('tests/hskuhn_eq1.strat')
 
-print "Half-Street Kuhn"
+print "Half-Street Kuhn Expected Value"
 print "Nash0 vs. Nash1: {0}".format(StrategyProfile(hskuhn_rules, [s0,s1]).expected_value())
 print "Nash0 vs. Eq1: {0}".format(StrategyProfile(hskuhn_rules, [s0,eq1]).expected_value())
 print "Eq0 vs. Nash1: {0}".format(StrategyProfile(hskuhn_rules, [eq0,s1]).expected_value())
 print "Eq0 vs. Eq1: {0}".format(StrategyProfile(hskuhn_rules, [eq0,eq1]).expected_value())
 print ""
+
+print "Half-Street Kuhn Best Response"
+profile = StrategyProfile(hskuhn_rules, [eq0,eq1])
+result = profile.best_response(1)
+br = result[0]
+ev = result[1]
+print "Eq0 BR: {0}".format(ev)
+assert(len(br.policy) == 6)
+assert(br.probs('Q:/c:') == [0,1,0])
+assert(br.probs('K:/c:') == [0,1,0])
+assert(br.probs('A:/c:') == [0,1,0])
+assert(br.probs('Q:/r:') == [1,0,0])
+assert(br.probs('K:/r:') == [0,1,0])
+assert(br.probs('A:/r:') == [0,1,0])
+print ""
+
+sys.exit(0)
 
 leduc_rules = leduc_rules()
 leduc_gt = leduc_gametree()
@@ -69,7 +86,7 @@ rand1.load_from_file('strategies/leduc/random.strat')
 """
 All leduc test values were derived using the open_cfr implementation from UoAlberta
 """
-print "Leduc"
+print "Leduc Expected Value"
 profile = StrategyProfile(leduc_rules, [s0,s1])
 profile.gametree = leduc_gt
 result = profile.expected_value()
@@ -105,6 +122,30 @@ profile.gametree = leduc_gt
 result = profile.expected_value()
 print "Random vs. Nash1: {0}".format(result)
 assert(result[0] >= -0.84791 and result[0] <= -0.84790)
+
+print ""
+
+print "Leduc Best Response"
+profile = StrategyProfile(leduc_rules, [s0,s1])
+result = profile.best_response(1)
+print "Nash0 BR: {0}".format(result[1])
+
+result = profile.best_response(0)
+print "Nash1 BR: {0}".format(result[1])
+
+profile = StrategyProfile(leduc_rules, [eq0,eq1])
+result = profile.best_response(1)
+print "Eq0 BR: {0}".format(result[1])
+
+result = profile.best_response(0)
+print "Eq1 BR: {0}".format(result[1])
+
+profile = StrategyProfile(leduc_rules, [rand0, rand1])
+result = profile.best_response(1)
+print "Rand0 BR: {0}".format(result[1])
+
+result = profile.best_response(0)
+print "Rand1 BR: {0}".format(result[1])
 
 print ""
 
