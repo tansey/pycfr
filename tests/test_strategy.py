@@ -4,7 +4,43 @@ sys.path.insert(0,os.path.realpath('.'))
 from pokerstrategy import *
 from pokergames import *
 
+def near(val, expected):
+    return val >= (expected - 0.000001) and val <= (expected + 0.000001)
+
+print ''
+print ''
 print 'Testing Strategy'
+print ''
+print ''
+
+
+print 'No-action game with 1 holecard followed by 1 boardcard'
+players = 2
+deck = [Card(14,1),Card(13,1),Card(12,1),Card(11,1)]
+ante = 1
+blinds = None
+rounds = [RoundInfo(holecards=1,boardcards=1,betsize=1,maxbets=[0,0])]
+no_action_rules = GameRules(players, deck, rounds, ante, blinds, handeval=leduc_eval, infoset_format=leduc_format)
+no_action_gametree = GameTree(no_action_rules)
+no_action_gametree.build()
+s0 = Strategy(0)
+s0.build_default(no_action_gametree)
+s1 = Strategy(1)
+s1.build_default(no_action_gametree)
+profile = StrategyProfile(no_action_rules, [s0,s1])
+expected_value = profile.expected_value()
+#print 'Expected values: [{0:.9f},{1:.9f}]'.format(expected_value[0], expected_value[1])
+assert(expected_value >= (-0.0001,-0.0001) and expected_value <= (0.0001,0.0001))
+best_responses = profile.best_response()
+br = best_responses[0]
+brev = best_responses[1]
+#print 'Best responses: {0}'.format([r.policy for r in br.strategies])
+print 'Best response EV: {0}'.format(brev)
+assert(brev >= (-0.0001,-0.0001) and brev <= (0.0001,0.0001))
+print 'All passed!'
+print ''
+
+
 
 hskuhn_rules = half_street_kuhn_rules()
 hskuhn_gametree = half_street_kuhn_gametree()
@@ -31,11 +67,25 @@ print "Eq0 vs. Eq1: {0}".format(StrategyProfile(hskuhn_rules, [eq0,eq1]).expecte
 print ""
 
 print "Half-Street Kuhn Best Response"
-profile = StrategyProfile(hskuhn_rules, [eq0,eq1])
-result = profile.best_response(1)
-br = result[0]
-ev = result[1]
-print "Eq0 BR: {0}".format(ev)
+overbet0 = Strategy(0)
+overbet0.policy = { 'Q:/:': [0,0.5,0.5], 'K:/:': [0,1,0], 'A:/:': [0,0,1] }
+overbet1 = Strategy(1)
+overbet1.policy = { 'Q:/c:': [0,1,0], 'K:/c:': [0,1,0], 'A:/c:': [0,1,0], 'Q:/r:': [1,0,0], 'K:/r:': [0.5,0.5,0], 'A:/r:': [0,1,0] }
+profile = StrategyProfile(hskuhn_rules, [overbet0,overbet1])
+result = profile.best_response()
+br = result[0].strategies[0]
+ev = result[1][0]
+print "Overbet0 BR EV: {0}".format(ev)
+print br.policy
+assert(len(br.policy) == 3)
+assert(br.probs('Q:/:') == [0,1,0])
+assert(br.probs('K:/:') == [0,1,0])
+assert(br.probs('A:/:') == [0,0,1])
+assert(near(ev, 1.0/12.0))
+
+br = result[0].strategies[1]
+ev = result[1][1]
+print "Overbet1 BR: {0}".format(ev)
 assert(len(br.policy) == 6)
 assert(br.probs('Q:/c:') == [0,1,0])
 assert(br.probs('K:/c:') == [0,1,0])
@@ -43,9 +93,37 @@ assert(br.probs('A:/c:') == [0,1,0])
 assert(br.probs('Q:/r:') == [1,0,0])
 assert(br.probs('K:/r:') == [0,1,0])
 assert(br.probs('A:/r:') == [0,1,0])
+assert(near(ev, 0))
+
+"""
+profile = StrategyProfile(hskuhn_rules, [eq0,eq1])
+result = profile.best_response()
+br = result[0].strategies[0]
+ev = result[1][0]
+print "Eq0 BR: {0}".format(ev)
+print "Eq0 BR policy: {0}".format(br.policy)
+assert(len(br.policy) == 3)
+assert(br.probs('Q:/:') == [0,1,0])
+assert(br.probs('K:/:') == [0,1,0])
+assert(br.probs('A:/:') == [0,0,1])
+
+br = result[0].strategies[1]
+ev = result[1][1]
+print "Eq1 BR: {0}".format(ev)
+print "Eq1 BR policy: {0}".format(br.policy)
+assert(len(br.policy) == 6)
+assert(br.probs('Q:/c:') == [0,1,0])
+assert(br.probs('K:/c:') == [0,1,0])
+assert(br.probs('A:/c:') == [0,1,0])
+assert(br.probs('Q:/r:') == [1,0,0])
+assert(br.probs('K:/r:') == [0,1,0])
+assert(br.probs('A:/r:') == [0,1,0])
+"""
+
+print 'All passed!'
 print ""
 
-sys.exit(0)
+#sys.exit(0)
 
 leduc_rules = leduc_rules()
 leduc_gt = leduc_gametree()
@@ -127,25 +205,34 @@ print ""
 
 print "Leduc Best Response"
 profile = StrategyProfile(leduc_rules, [s0,s1])
-result = profile.best_response(1)
-print "Nash0 BR: {0}".format(result[1])
+result = profile.best_response()
+br = result[0].strategies[0]
+ev = result[1][0]
+print "Nash0 BR EV: {0}".format(ev)
 
-result = profile.best_response(0)
-print "Nash1 BR: {0}".format(result[1])
+br = result[0].strategies[1]
+ev = result[1][1]
+print "Nash1 BR EV: {0}".format(ev)
 
 profile = StrategyProfile(leduc_rules, [eq0,eq1])
-result = profile.best_response(1)
-print "Eq0 BR: {0}".format(result[1])
+result = profile.best_response()
+br = result[0].strategies[0]
+ev = result[1][0]
+print "Eq0 BR EV: {0}".format(ev)
 
-result = profile.best_response(0)
-print "Eq1 BR: {0}".format(result[1])
+br = result[0].strategies[1]
+ev = result[1][1]
+print "Eq1 BR EV: {0}".format(ev)
 
 profile = StrategyProfile(leduc_rules, [rand0, rand1])
-result = profile.best_response(1)
-print "Rand0 BR: {0}".format(result[1])
+result = profile.best_response()
+br = result[0].strategies[0]
+ev = result[1][0]
+print "Rand0 BR: {0}".format(ev)
 
-result = profile.best_response(0)
-print "Rand1 BR: {0}".format(result[1])
+br = result[0].strategies[1]
+ev = result[1][1]
+print "Rand1 BR: {0}".format(ev)
 
 print ""
 

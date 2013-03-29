@@ -240,6 +240,20 @@ class PublicTree(GameTree):
     def __init__(self, rules):
         GameTree.__init__(self, GameRules(rules.players, rules.deck, rules.roundinfo, rules.ante, rules.blinds, rules.handeval, partial(multi_infoset_format, rules.infoset_format)))
 
+    def build(self):
+        # Assume everyone is in
+        players_in = [True] * self.rules.players
+        # Collect antes
+        committed = [self.rules.ante] * self.rules.players
+        bets = [0] * self.rules.players
+        # Collect blinds
+        next_player = self.collect_blinds(committed, bets, 0)
+        holes = [[()]] * self.rules.players
+        board = ()
+        bet_history = ""
+        self.root = self.build_rounds(None, players_in, committed, holes, board, self.rules.deck, bet_history, 0, bets, next_player)
+
+
     def build_holecards(self, root, next_player, players_in, committed, holes, board, deck, bet_history, round_idx, min_actions_this_round, actions_this_round, bets):
         cur_round = self.rules.roundinfo[round_idx]
         hnode = HolecardChanceNode(root, committed, holes, board, self.rules.deck, "", cur_round.holecards)
