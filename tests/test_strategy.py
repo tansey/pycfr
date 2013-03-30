@@ -41,7 +41,6 @@ print 'All passed!'
 print ''
 
 
-
 hskuhn_rules = half_street_kuhn_rules()
 hskuhn_gametree = half_street_kuhn_gametree()
 
@@ -94,31 +93,6 @@ assert(br.probs('Q:/r:') == [1,0,0])
 assert(br.probs('K:/r:') == [0,1,0])
 assert(br.probs('A:/r:') == [0,1,0])
 assert(near(ev, 0))
-
-"""
-profile = StrategyProfile(hskuhn_rules, [eq0,eq1])
-result = profile.best_response()
-br = result[0].strategies[0]
-ev = result[1][0]
-print "Eq0 BR: {0}".format(ev)
-print "Eq0 BR policy: {0}".format(br.policy)
-assert(len(br.policy) == 3)
-assert(br.probs('Q:/:') == [0,1,0])
-assert(br.probs('K:/:') == [0,1,0])
-assert(br.probs('A:/:') == [0,0,1])
-
-br = result[0].strategies[1]
-ev = result[1][1]
-print "Eq1 BR: {0}".format(ev)
-print "Eq1 BR policy: {0}".format(br.policy)
-assert(len(br.policy) == 6)
-assert(br.probs('Q:/c:') == [0,1,0])
-assert(br.probs('K:/c:') == [0,1,0])
-assert(br.probs('A:/c:') == [0,1,0])
-assert(br.probs('Q:/r:') == [1,0,0])
-assert(br.probs('K:/r:') == [0,1,0])
-assert(br.probs('A:/r:') == [0,1,0])
-"""
 
 print 'All passed!'
 print ""
@@ -209,10 +183,12 @@ result = profile.best_response()
 br = result[0].strategies[0]
 ev = result[1][0]
 print "Nash0 BR EV: {0}".format(ev)
+br.save_to_file('tests/leduc_nash0_br.strat')
 
 br = result[0].strategies[1]
 ev = result[1][1]
 print "Nash1 BR EV: {0}".format(ev)
+br.save_to_file('tests/leduc_nash1_br.strat')
 
 profile = StrategyProfile(leduc_rules, [eq0,eq1])
 result = profile.best_response()

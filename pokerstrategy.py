@@ -133,8 +133,6 @@ class StrategyProfile(object):
                 if count > 0:
                     player_payoffs[hc] /= float(count)
             payoffs[player] = player_payoffs
-        print 'Payoffs for {0}: {1}'.format(root.bet_history, payoffs)
-        print 'reachprobs for {0}: {1}'.format(root.bet_history, reachprobs)
         return payoffs
 
     def br_holecard_node(self, root, reachprobs, responses):
@@ -151,29 +149,21 @@ class StrategyProfile(object):
         return payoffs
 
     def br_boardcard_node(self, root, reachprobs, responses):
+        prevlen = len(reachprobs[0].keys()[0])
+        possible_deals = float(self.choose(len(root.deck) - prevlen,root.todeal))
         payoffs = [{ hc: 0 for hc in root.holecards[player] } for player in range(self.rules.players)]
         for bc in root.children:
-            next_reachprobs = [{ hc: reachprobs[player][hc] * len(reachprobs[player]) / float(len(bc.holecards[player])) for hc in bc.holecards[player] } for player in range(self.rules.players)]
+            next_reachprobs = [{ hc: reachprobs[player][hc] / possible_deals for hc in bc.holecards[player] } for player in range(self.rules.players)]
             subpayoffs = self.br_helper(bc, next_reachprobs, responses)
             for player,subpayoff in enumerate(subpayoffs):
                 for hand,winnings in subpayoff.items():
                     payoffs[player][hand] += winnings
-        # normalize payoffs before returning them
-        possible_deals = []
-        for player in range(self.rules.players):
-            n = len(root.deck) - len(root.holecards[player][0])
-            k = root.todeal
-            possible_deals.append(float(self.choose(n,k)))
-        for player in range(self.rules.players):
-            for hand in payoffs[player]:
-                payoffs[player][hand] /= possible_deals[player]
         return payoffs
 
     def br_action_node(self, root, reachprobs, responses):
         strategy = self.strategies[root.player]
         next_reachprobs = deepcopy(reachprobs)
         action_probs = { hc: strategy.probs(self.rules.infoset_format(root.player, hc, root.board, root.bet_history)) for hc in root.holecards[root.player] }
-        print 'Action probs for {0}: {1}'.format(root.bet_history, action_probs)
         action_payoffs = [None, None, None]
         if root.fold_action:
             next_reachprobs[root.player] = { hc: action_probs[hc][FOLD] * reachprobs[root.player][hc] for hc in root.holecards[root.player] }
@@ -196,7 +186,6 @@ class StrategyProfile(object):
                     for hc,winnings in subpayoff[player].iteritems():
                         player_payoffs[hc] += winnings
                 payoffs.append(player_payoffs)
-        print 'Payoffs for {0}: {1}'.format(root.bet_history, payoffs)
         return payoffs
 
     def br_response_action(self, root, responses, action_payoffs):
