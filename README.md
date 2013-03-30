@@ -26,7 +26,7 @@ Or use one of the pre-built games:
 
 ```python
 from pokergames import *
-gametree = leduc()
+gametree = leduc_gametree()
 ```
 
 Evaluating a strategy profile
@@ -53,6 +53,39 @@ profile = StrategyProfile(rules, [s0,s1])
 ev = profile.expected_value()
 ```
 
+Getting the best response strategy
+----------------------------------
+Given a strategy profile, you can calculate the best response strategy for each agent:
+
+```python
+from pokertrees import *
+from pokergames import *
+from pokerstrategy import *
+rules = leduc_rules()
+
+# load first player strategy
+s0 = Strategy(0)
+s0.load_from_file('strategies/leduc/0.strat')
+
+# load second player strategy
+s1 = Strategy(1)
+s1.load_from_file('strategies/leduc/1.strat')
+
+# Create a strategy profile for this game
+profile = StrategyProfile(rules, [s0,s1])
+
+# Calculates the best response for every agent and the value of that response
+brev = profile.best_response()
+
+# The first element is a StrategyProfile of all the best responses
+best_response = brev[0]
+
+# The second element is a list of expected values of the responses vs. the original strategy profile
+expected_values = brev[1]
+```
+
+The underlying implementation of the best response calculation uses a generalized version of the public tree algorithm presented in [1].
+
 Tests
 -----
 Tests for the game tree code are implemented in the `tests` directory.
@@ -67,8 +100,6 @@ TODO
 ----
 The following is a list of items that still need to be implemented:
 
-- Best response
-- Exploitability (EV of BR)
 - CFR
 - MC-CFR
 - Pretty print game tree
@@ -81,3 +112,10 @@ Contributors
 Wesley Tansey
 
 Hand evaluator code courtesy of [Alvin Liang's library](https://github.com/aliang/pokerhand-eval).
+
+
+
+
+References
+----------
+[1] Johanson, Michael, Kevin Waugh, Michael Bowling, and Martin Zinkevich. "Accelerating best response calculation in large extensive games." In Proceedings of the Twenty-Second international joint conference on Artificial Intelligence-Volume Volume One, pp. 258-265. AAAI Press, 2011.

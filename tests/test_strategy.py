@@ -5,7 +5,12 @@ from pokerstrategy import *
 from pokergames import *
 
 def near(val, expected):
-    return val >= (expected - 0.000001) and val <= (expected + 0.000001)
+    return val >= (expected - 0.0001) and val <= (expected + 0.0001)
+
+def validate_strategy(s, filename):
+    validation_strategy = Strategy(s.player)
+    validation_strategy.load_from_file(filename)
+    assert(s.policy == validation_strategy.policy)
 
 print ''
 print ''
@@ -184,31 +189,43 @@ br = result[0].strategies[0]
 ev = result[1][0]
 print "Nash0 BR EV: {0}".format(ev)
 br.save_to_file('tests/leduc_nash0_br.strat')
+assert(near(ev, -0.0854363))
+validate_strategy(br, 'strategies/leduc/nash_br0.strat')
 
 br = result[0].strategies[1]
 ev = result[1][1]
 print "Nash1 BR EV: {0}".format(ev)
 br.save_to_file('tests/leduc_nash1_br.strat')
+assert(near(ev, 0.0858749))
+validate_strategy(br, 'strategies/leduc/nash_br1.strat')
 
 profile = StrategyProfile(leduc_rules, [eq0,eq1])
 result = profile.best_response()
 br = result[0].strategies[0]
 ev = result[1][0]
 print "Eq0 BR EV: {0}".format(ev)
+assert(near(ev, 2.0875))
+validate_strategy(br, 'strategies/leduc/equal_br0.strat')
 
 br = result[0].strategies[1]
 ev = result[1][1]
 print "Eq1 BR EV: {0}".format(ev)
+assert(near(ev, 2.65972))
+validate_strategy(br, 'strategies/leduc/equal_br1.strat')
 
 profile = StrategyProfile(leduc_rules, [rand0, rand1])
 result = profile.best_response()
 br = result[0].strategies[0]
 ev = result[1][0]
 print "Rand0 BR: {0}".format(ev)
+assert(near(ev, 2.14414))
+validate_strategy(br, 'strategies/leduc/random_br0.strat')
 
 br = result[0].strategies[1]
 ev = result[1][1]
 print "Rand1 BR: {0}".format(ev)
+assert(near(ev, 3.21721))
+validate_strategy(br, 'strategies/leduc/random_br1.strat')
 
 print ""
 
