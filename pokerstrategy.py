@@ -1,5 +1,20 @@
 from pokertrees import *
 
+def choose(n, k):
+    """
+    A fast way to calculate binomial coefficients by Andrew Dalke (contrib).
+    """
+    if 0 <= k <= n:
+        ntok = 1
+        ktok = 1
+        for t in xrange(1, min(k, n - k) + 1):
+            ntok *= n
+            ktok *= t
+            n -= 1
+        return ntok // ktok
+    else:
+        return 0
+
 class Strategy(object):
     def __init__(self, player):
         self.player = player
@@ -138,7 +153,7 @@ class StrategyProfile(object):
     def br_holecard_node(self, root, reachprobs, responses):
         assert(len(root.children) == 1)
         prevlen = len(reachprobs[0].keys()[0])
-        possible_deals = float(self.choose(len(root.deck) - prevlen,root.todeal))
+        possible_deals = float(choose(len(root.deck) - prevlen,root.todeal))
         next_reachprobs = [{ hc: reachprobs[player][hc[0:prevlen]] / possible_deals for hc in root.children[0].holecards[player] } for player in range(self.rules.players)]
         subpayoffs = self.br_helper(root.children[0], next_reachprobs, responses)
         payoffs = [{ hc: 0 for hc in root.holecards[player] } for player in range(self.rules.players)]
@@ -150,7 +165,7 @@ class StrategyProfile(object):
 
     def br_boardcard_node(self, root, reachprobs, responses):
         prevlen = len(reachprobs[0].keys()[0])
-        possible_deals = float(self.choose(len(root.deck) - prevlen,root.todeal))
+        possible_deals = float(choose(len(root.deck) - prevlen,root.todeal))
         payoffs = [{ hc: 0 for hc in root.holecards[player] } for player in range(self.rules.players)]
         for bc in root.children:
             next_reachprobs = [{ hc: reachprobs[player][hc] / possible_deals for hc in bc.holecards[player] } for player in range(self.rules.players)]
@@ -218,18 +233,5 @@ class StrategyProfile(object):
             player_payoffs[hc] = max_value
         return player_payoffs
 
-    def choose(self, n, k):
-        """
-        A fast way to calculate binomial coefficients by Andrew Dalke (contrib).
-        """
-        if 0 <= k <= n:
-            ntok = 1
-            ktok = 1
-            for t in xrange(1, min(k, n - k) + 1):
-                ntok *= n
-                ktok *= t
-                n -= 1
-            return ntok // ktok
-        else:
-            return 0
+
 
