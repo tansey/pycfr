@@ -109,6 +109,7 @@ class CounterfactualRegretMinimizer(object):
             payoffs.append(player_payoffs)
         # Update regret calculations
         self.cfr_regret_update(root, action_payoffs, payoffs[root.player])
+        #print '{0} utility: {1}'.format(root.bet_history, payoffs)
         return payoffs
 
     def cfr_strategy_update(self, root):
@@ -137,7 +138,7 @@ class CounterfactualRegretMinimizer(object):
             if subpayoff is None:
                 continue
             for hc,winnings in subpayoff[root.player].iteritems():
-                immediate_regret = winnings - ev[hc]
+                immediate_regret = max(winnings - ev[hc], 0)
                 infoset = self.rules.infoset_format(root.player, hc, root.board, root.bet_history)
                 prev_regret = self.regret[root.player][infoset][i]
                 self.regret[root.player][infoset][i] = 1.0 / (self.iterations + 1) * (self.iterations * prev_regret + immediate_regret)
