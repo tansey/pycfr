@@ -10,14 +10,14 @@ def near(val, expected, distance=0.0001):
 
 print ''
 print ''
-print 'Testing CFR'
+print 'Testing Public Chance Sampling (PCS) CFR'
 print ''
 print ''
 
 print 'Computer NE for Half-Street Kuhn poker'
 
 hskuhn = half_street_kuhn_rules()
-cfr = CounterfactualRegretMinimizer(hskuhn)
+cfr = PublicChanceSamplingCFR(hskuhn)
 iterations_per_block = 1000
 blocks = 10
 for block in range(blocks):
@@ -49,9 +49,9 @@ print ''
 print 'Computing NE for Leduc poker'
 leduc = leduc_rules()
 
-cfr = CounterfactualRegretMinimizer(leduc)
+cfr = PublicChanceSamplingCFR(leduc)
 
-iterations_per_block = 10
+iterations_per_block = 1000
 blocks = 1000
 for block in range(blocks):
     print 'Iterations: {0}'.format(block * iterations_per_block)

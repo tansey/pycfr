@@ -1,5 +1,6 @@
 from pokertrees import *
 from pokerstrategy import *
+import random
 
 class CounterfactualRegretMinimizer(object):
     def __init__(self, rules):
@@ -13,6 +14,7 @@ class CounterfactualRegretMinimizer(object):
             s.build_default(gametree)
             self.regret.append({ infoset: [0,0,0] for infoset in s.policy })
         self.tree = PublicTree(rules)
+        self.tree.build()
 
     def run(self, num_iterations):
         for iteration in range(num_iterations):
@@ -20,8 +22,6 @@ class CounterfactualRegretMinimizer(object):
             self.iterations += 1
 
     def cfr(self):
-        if self.tree.root is None:
-            self.tree.build()
         self.cfr_helper(self.tree.root, [{(): 1} for _ in range(self.rules.players)])
 
     def cfr_helper(self, root, reachprobs):
@@ -142,3 +142,34 @@ class CounterfactualRegretMinimizer(object):
                 infoset = self.rules.infoset_format(root.player, hc, root.board, root.bet_history)
                 prev_regret = self.regret[root.player][infoset][i]
                 self.regret[root.player][infoset][i] = 1.0 / (self.iterations + 1) * (self.iterations * prev_regret + immediate_regret)
+
+class PublicChanceSamplingCFR(CounterfactualRegretMinimizer):
+    def __init__(self, rules):
+        CounterfactualRegretMinimizer.__init__(self, rules)
+        self.init_helper(self.tree.root)
+
+    def init_helper(self, node):
+        node.visits = 0
+        try:
+            for child in node.children:
+                self.init_helper(child)
+        except AttributeError:
+            return
+
+    def cfr_helper(self, root, reachprobs):
+        root.visits += 1
+        return CounterfactualRegretMinimizer.cfr_helper(self, root, reachprobs)
+
+    def cfr_boardcard_node(self, root, reachprobs):
+        bc = random.choice(root.children)
+        return self.cfr_helper(bc, reachprobs)
+
+    def cfr_regret_update(self, root, action_payoffs, ev):
+        for i,subpayoff in enumerate(action_payoffs):
+            if subpayoff is None:
+                continue
+            for hc,winnings in subpayoff[root.player].iteritems():
+                immediate_regret = max(winnings - ev[hc], 0)
+                infoset = self.rules.infoset_format(root.player, hc, root.board, root.bet_history)
+                prev_regret = self.regret[root.player][infoset][i]
+                self.regret[root.player][infoset][i] = 1.0 / (root.visits + 1) * (root.visits * prev_regret + immediate_regret)

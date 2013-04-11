@@ -86,6 +86,30 @@ expected_values = brev[1]
 
 The underlying implementation of the best response calculation uses a generalized version of the public tree algorithm presented in [1].
 
+Finding a Nash equilibrium
+--------------------------
+Given the rules for a game, you can run the Counterfactual Regret (CFR) Minimization algorithm:
+
+```python
+# Get the rules of the game
+hskuhn = half_street_kuhn_rules()
+
+# Create the CFR minimizer
+cfr = CounterfactualRegretMinimizer(hskuhn)
+
+# Run a number of iterations, determining the exploitability of the agents periodically
+iterations_per_block = 1000
+blocks = 50
+for block in range(blocks):
+    print 'Iterations: {0}'.format(block * iterations_per_block)
+    cfr.run(iterations_per_block)
+    result = cfr.profile.best_response()
+    print 'Best response EV: {0}'.format(result[1])
+
+# The final result is a strategy profile of epsilon-optimal agents
+nash_strategies = cfr.profile
+```
+
 Tests
 -----
 Tests for the game tree code are implemented in the `tests` directory.
@@ -94,16 +118,18 @@ Tests for the game tree code are implemented in the `tests` directory.
 
 - test_strategy.py - Tests the strategy functionality by loading some pre-computed near-optimal strategies for Leduc poker and a default equal-probability policy.
 
+- test_cfr.py - Tests the CFR minimizer functionality by running it on half-street Kuhn poker and Leduc poker. WARNING: Leduc poker is slow due to the size of the game.
+
 Note the tests are intended to be run from the main directory, e.g. `python test/test_gametree.py`. They make some assumptions about relative paths when importing modules and loading and saving files.
 
 TODO
 ----
 The following is a list of items that still need to be implemented:
 
-- CFR
-- MC-CFR
+- MC-CFR (CS, PCS, AS)
 - Pretty print game tree
 - Simulator from game tree
+- Handle edge cases where holecards come after the first round when there may be a variable number of players
 
 
 Contributors
