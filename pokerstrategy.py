@@ -1,4 +1,5 @@
 from pokertrees import *
+import random
 
 def choose(n, k):
     """
@@ -34,6 +35,17 @@ class Strategy(object):
     def probs(self, infoset):
         assert(infoset in self.policy)
         return self.policy[infoset]
+
+    def sample_action(self, infoset):
+        assert(infoset in self.policy)
+        probs = self.policy[infoset]
+        val = random.random()
+        total = 0
+        for i,p in enumerate(probs):
+            total += p
+            if p > 0 and val <= total:
+                return i
+        raise Exception('Invalid probability distribution. Infoset: {0} Probs: {1}'.format(infoset, probs))
 
     def load_from_file(self, filename):
         self.policy = {}

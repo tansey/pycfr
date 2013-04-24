@@ -1,7 +1,7 @@
 pyCFR
 =====
 
-A python implementation of Counterfactual Regret Minimization for flop-style poker games like Texas Hold'em, Leduc, and Kuhn poker.
+A python implementation of Counterfactual Regret Minimization (CFR) [1] for flop-style poker games like Texas Hold'em, Leduc, and Kuhn poker. The library currently implements both vanilla CFR and Public Chance Sampling (PCS) CFR [2].
 
 Note that this library is intended for *very* simple games. It is written in pure python and is not optimized for speed nor memory usage. Full-scale Texas Hold'em will likely be too slow and too big to handle.
 
@@ -84,7 +84,7 @@ best_response = brev[0]
 expected_values = brev[1]
 ```
 
-The underlying implementation of the best response calculation uses a generalized version of the public tree algorithm presented in [1].
+The underlying implementation of the best response calculation uses a generalized version of the public tree algorithm presented in [3].
 
 Finding a Nash equilibrium
 --------------------------
@@ -120,6 +120,8 @@ Tests for the game tree code are implemented in the `tests` directory.
 
 - test_cfr.py - Tests the CFR minimizer functionality by running it on half-street Kuhn poker and Leduc poker. WARNING: Leduc poker is slow due to the size of the game.
 
+- test_pcscfr.py - Tests the Public Chance Sampling (PCS) CFR minimizer functionality by running it on half-street Kuhn poker and Leduc poker. WARNING: Leduc poker is slow due to the size of the game.
+
 Note the tests are intended to be run from the main directory, e.g. `python test/test_gametree.py`. They make some assumptions about relative paths when importing modules and loading and saving files.
 
 TODO
@@ -127,8 +129,6 @@ TODO
 The following is a list of items that still need to be implemented:
 
 - MC-CFR (CS, PCS, AS)
-- Pretty print game tree
-- Simulator from game tree
 - Handle edge cases where holecards come after the first round when there may be a variable number of players
 
 
@@ -144,4 +144,8 @@ Hand evaluator code courtesy of [Alvin Liang's library](https://github.com/alian
 
 References
 ----------
-[1] Johanson, Michael, Kevin Waugh, Michael Bowling, and Martin Zinkevich. "Accelerating best response calculation in large extensive games." In Proceedings of the Twenty-Second international joint conference on Artificial Intelligence-Volume Volume One, pp. 258-265. AAAI Press, 2011.
+[1] Zinkevich, M., Johanson, M., Bowling, M., & Piccione, C. (2008). Regret minimization in games with incomplete information. Advances in neural information processing systems, 20, 1729-1736.
+
+[2] Johanson, M., Bard, N., Lanctot, M., Gibson, R., & Bowling, M. (2012, June). Efficient Nash equilibrium approximation through Monte Carlo counterfactual regret minimization. In Proceedings of the 11th International Conference on Autonomous Agents and Multiagent Systems-Volume 2 (pp. 837-846). International Foundation for Autonomous Agents and Multiagent Systems.
+
+[3] Johanson, M., Waugh, K., Bowling, M., & Zinkevich, M. (2011, July). Accelerating best response calculation in large extensive games. In Proceedings of the Twenty-Second international joint conference on Artificial Intelligence-Volume Volume One (pp. 258-265). AAAI Press.

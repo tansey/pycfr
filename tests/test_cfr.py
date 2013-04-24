@@ -17,7 +17,7 @@ print ''
 print 'Computer NE for Half-Street Kuhn poker'
 
 hskuhn = half_street_kuhn_rules()
-cfr = CounterfactualRegretMinimizer(hskuhn)
+cfr = ProperCounterfactualRegretMinimizer(hskuhn)
 iterations_per_block = 1000
 blocks = 10
 for block in range(blocks):
@@ -27,7 +27,7 @@ for block in range(blocks):
     print 'Best response EV: {0}'.format(result[1])
 print cfr.profile.strategies[0].policy
 print cfr.profile.strategies[1].policy
-print cfr.regret
+print cfr.counterfactual_regret
 print 'Verifying P1 policy'
 assert(near(cfr.profile.strategies[0].policy['Q:/:'][CALL], 2.0 / 3.0, 0.01))
 assert(near(cfr.profile.strategies[0].policy['Q:/:'][RAISE], 1.0 / 3.0, 0.01))
@@ -49,7 +49,7 @@ print ''
 print 'Computing NE for Leduc poker'
 leduc = leduc_rules()
 
-cfr = CounterfactualRegretMinimizer(leduc)
+cfr = ProperCounterfactualRegretMinimizer(leduc)
 
 iterations_per_block = 10
 blocks = 1000
