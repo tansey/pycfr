@@ -282,9 +282,6 @@ class CounterfactualRegretMinimizer(object):
             self.current_profile.strategies[root.player].policy[infoset] = probs
             for i in range(3):
                 self.action_reachprobs[root.player][infoset][i] += reachprobs[root.player][hc] * probs[i]
-            if sum(self.action_reachprobs[root.player][infoset]) == 0:
-                print 'Broken: {0} Iterations: {1} reachprobs: {2} probs: {3} action_reachprobs: {4}'.format(infoset, self.iterations, reachprobs[root.player][hc], probs, self.action_reachprobs[root.player][infoset])
-            #self.profile.strategies[root.player].policy[infoset] = [1.0 / (self.iterations + 1.0) * (self.iterations * self.profile.strategies[root.player].policy[infoset][i] + probs[i]) for i in range(3)]
             self.profile.strategies[root.player].policy[infoset] = [self.action_reachprobs[root.player][infoset][i] / sum(self.action_reachprobs[root.player][infoset]) for i in range(3)]
         return self.current_profile.strategies[root.player]
 
