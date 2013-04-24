@@ -17,7 +17,7 @@ print ''
 print 'Computer NE for Half-Street Kuhn poker'
 
 hskuhn = half_street_kuhn_rules()
-cfr = ProperCounterfactualRegretMinimizer(hskuhn)
+cfr = CounterfactualRegretMinimizer(hskuhn)
 iterations_per_block = 1000
 blocks = 10
 for block in range(blocks):
@@ -49,7 +49,7 @@ print ''
 print 'Computing NE for Leduc poker'
 leduc = leduc_rules()
 
-cfr = ProperCounterfactualRegretMinimizer(leduc)
+cfr = CounterfactualRegretMinimizer(leduc)
 
 iterations_per_block = 10
 blocks = 1000

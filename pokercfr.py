@@ -2,7 +2,7 @@ from pokertrees import *
 from pokerstrategy import *
 import random
 
-class CounterfactualRegretMinimizer(object):
+class WeirdCounterfactualRegretMinimizer(object):
     def __init__(self, rules):
         self.rules = rules
         self.profile = StrategyProfile(rules, [Strategy(i) for i in range(rules.players)])
@@ -142,19 +142,21 @@ class CounterfactualRegretMinimizer(object):
                 prev_regret = self.regret[root.player][infoset][i]
                 self.regret[root.player][infoset][i] = 1.0 / (self.iterations + 1) * (self.iterations * prev_regret + immediate_regret)
 
-class ProperCounterfactualRegretMinimizer(object):
+class CounterfactualRegretMinimizer(object):
     def __init__(self, rules):
         self.rules = rules
         self.profile = StrategyProfile(rules, [Strategy(i) for i in range(rules.players)])
         self.current_profile = StrategyProfile(rules, [Strategy(i) for i in range(rules.players)])
         self.iterations = 0
         self.counterfactual_regret = []
+        self.action_reachprobs = []
         # Note: building the game tree is a convenience. It's not strictly necessary for the algorithm.
         gametree = GameTree(rules)
         gametree.build()
         for s in self.profile.strategies:
             s.build_default(gametree)
             self.counterfactual_regret.append({ infoset: [0,0,0] for infoset in s.policy })
+            self.action_reachprobs.append({ infoset: [0,0,0] for infoset in s.policy })
         self.tree = PublicTree(rules)
         self.tree.build()
 
@@ -223,7 +225,7 @@ class ProperCounterfactualRegretMinimizer(object):
 
     def cfr_action_node(self, root, reachprobs):
         # Calculate strategy from counterfactual regret
-        strategy = self.cfr_strategy_update(root)
+        strategy = self.cfr_strategy_update(root, reachprobs)
         next_reachprobs = deepcopy(reachprobs)
         action_probs = { hc: strategy.probs(self.rules.infoset_format(root.player, hc, root.board, root.bet_history)) for hc in root.holecards[root.player] }
         action_payoffs = [None, None, None]
@@ -253,9 +255,15 @@ class ProperCounterfactualRegretMinimizer(object):
         self.cfr_regret_update(root, action_payoffs, payoffs[root.player])
         return payoffs
 
-    def cfr_strategy_update(self, root):
+    def cfr_strategy_update(self, root, reachprobs):
         if self.iterations == 0:
-            return self.profile.strategies[root.player]
+            default_strat = self.profile.strategies[root.player]
+            for hc in root.holecards[root.player]:
+                infoset = self.rules.infoset_format(root.player, hc, root.board, root.bet_history)
+                probs = default_strat.probs(infoset)
+                for i in range(3):
+                    self.action_reachprobs[root.player][infoset][i] += reachprobs[root.player][hc] * probs[i]
+            return default_strat
         for hc in root.holecards[root.player]:
             infoset = self.rules.infoset_format(root.player, hc, root.board, root.bet_history)
             prev_cfr = self.counterfactual_regret[root.player][infoset]
@@ -272,7 +280,12 @@ class ProperCounterfactualRegretMinimizer(object):
             else:
                 probs = [max(0,x) / sumpos_cfr for x in prev_cfr]
             self.current_profile.strategies[root.player].policy[infoset] = probs
-            self.profile.strategies[root.player].policy[infoset] = [1.0 / (self.iterations + 1.0) * (self.iterations * self.profile.strategies[root.player].policy[infoset][i] + probs[i]) for i in range(3)]
+            for i in range(3):
+                self.action_reachprobs[root.player][infoset][i] += reachprobs[root.player][hc] * probs[i]
+            if sum(self.action_reachprobs[root.player][infoset]) == 0:
+                print 'Broken: {0} Iterations: {1} reachprobs: {2} probs: {3} action_reachprobs: {4}'.format(infoset, self.iterations, reachprobs[root.player][hc], probs, self.action_reachprobs[root.player][infoset])
+            #self.profile.strategies[root.player].policy[infoset] = [1.0 / (self.iterations + 1.0) * (self.iterations * self.profile.strategies[root.player].policy[infoset][i] + probs[i]) for i in range(3)]
+            self.profile.strategies[root.player].policy[infoset] = [self.action_reachprobs[root.player][infoset][i] / sum(self.action_reachprobs[root.player][infoset]) for i in range(3)]
         return self.current_profile.strategies[root.player]
 
     def cfr_regret_update(self, root, action_payoffs, ev):
@@ -323,12 +336,45 @@ class PublicChanceSamplingCFR(CounterfactualRegretMinimizer):
                 return False
         return True
 
+    def cfr_strategy_update(self, root, reachprobs):
+        if root.visits == 0:
+            default_strat = self.profile.strategies[root.player]
+            for hc in root.holecards[root.player]:
+                infoset = self.rules.infoset_format(root.player, hc, root.board, root.bet_history)
+                probs = default_strat.probs(infoset)
+                for i in range(3):
+                    self.action_reachprobs[root.player][infoset][i] += reachprobs[root.player][hc] * probs[i]
+            return default_strat
+        for hc in root.holecards[root.player]:
+            infoset = self.rules.infoset_format(root.player, hc, root.board, root.bet_history)
+            prev_cfr = self.counterfactual_regret[root.player][infoset]
+            sumpos_cfr = sum([max(0,x) for x in prev_cfr])
+            if sumpos_cfr == 0:
+                total_actions = len(root.children)
+                probs = [0,0,0]
+                if root.fold_action:
+                    probs[FOLD] = 1.0 / total_actions
+                if root.call_action:
+                    probs[CALL] = 1.0 / total_actions
+                if root.raise_action:
+                    probs[RAISE] = 1.0 / total_actions
+            else:
+                probs = [max(0,x) / sumpos_cfr for x in prev_cfr]
+            self.current_profile.strategies[root.player].policy[infoset] = probs
+            for i in range(3):
+                self.action_reachprobs[root.player][infoset][i] += reachprobs[root.player][hc] * probs[i]
+            if sum(self.action_reachprobs[root.player][infoset]) == 0:
+                print 'Broken: {0} Iterations: {1} reachprobs: {2} probs: {3} action_reachprobs: {4}'.format(infoset, self.iterations, reachprobs[root.player][hc], probs, self.action_reachprobs[root.player][infoset])
+            self.profile.strategies[root.player].policy[infoset] = [self.action_reachprobs[root.player][infoset][i] / sum(self.action_reachprobs[root.player][infoset]) for i in range(3)]
+        return self.current_profile.strategies[root.player]
+
+
     def cfr_regret_update(self, root, action_payoffs, ev):
         for i,subpayoff in enumerate(action_payoffs):
             if subpayoff is None:
                 continue
             for hc,winnings in subpayoff[root.player].iteritems():
-                immediate_regret = max(winnings - ev[hc], 0)
+                immediate_cfr = winnings - ev[hc]
                 infoset = self.rules.infoset_format(root.player, hc, root.board, root.bet_history)
-                prev_regret = self.regret[root.player][infoset][i]
-                self.regret[root.player][infoset][i] = 1.0 / (root.visits + 1) * (root.visits * prev_regret + immediate_regret)
+                prev_cfr = self.counterfactual_regret[root.player][infoset][i]
+                self.counterfactual_regret[root.player][infoset][i] = 1.0 / (root.visits + 1) * (root.visits * prev_cfr + immediate_cfr)
