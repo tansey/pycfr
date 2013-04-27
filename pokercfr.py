@@ -168,10 +168,13 @@ class PublicChanceSamplingCFR(CounterfactualRegretMinimizer):
 
     def cfr_boardcard_node(self, root, reachprobs):
         num_dealt = len(root.children[0].board) - len(root.board)
+        prevlen = len(reachprobs[0].keys()[0])
+        possible_deals = float(choose(len(root.deck) - prevlen,root.todeal))
         for bc in root.children:
             if self.boardmatch(num_dealt, bc):
                 self.top_card += num_dealt
-                results = self.cfr_helper(bc, reachprobs)
+                next_reachprobs = [{ hc: reachprobs[player][hc] / possible_deals for hc in bc.holecards[player] } for player in range(self.rules.players)]
+                results = self.cfr_helper(bc, next_reachprobs)
                 self.top_card -= num_dealt
                 return results
         raise Exception('Sampling from impossible board card')
