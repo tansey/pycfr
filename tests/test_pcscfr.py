@@ -25,6 +25,7 @@ for block in range(blocks):
     cfr.run(iterations_per_block)
     result = cfr.profile.best_response()
     print 'Best response EV: {0}'.format(result[1])
+    print 'Total exploitability: {0}'.format(sum(result[1]))
 print cfr.profile.strategies[0].policy
 print cfr.profile.strategies[1].policy
 print cfr.counterfactual_regret
@@ -58,6 +59,6 @@ for block in range(blocks):
     cfr.run(iterations_per_block)
     result = cfr.profile.best_response()
     print 'Best response EV: {0}'.format(result[1])
-
+    print 'Total exploitability: {0}'.format(sum(result[1]))
 print 'Done!'
 print ''

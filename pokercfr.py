@@ -87,20 +87,20 @@ class CounterfactualRegretMinimizer(object):
         # Calculate strategy from counterfactual regret
         strategy = self.cfr_strategy_update(root, reachprobs)
         next_reachprobs = deepcopy(reachprobs)
-        action_probs = { hc: strategy.probs(self.rules.infoset_format(root.player, hc, root.board, root.bet_history)) for hc in root.holecards[root.player] }
+        action_probs = { hc: strategy.probs(self.rules.infoset_format(root.player, hc, root.board, root.bet_history)) for hc in reachprobs[root.player] }
         action_payoffs = [None, None, None]
         if root.fold_action:
-            next_reachprobs[root.player] = { hc: action_probs[hc][FOLD] * reachprobs[root.player][hc] for hc in root.holecards[root.player] }
+            next_reachprobs[root.player] = { hc: action_probs[hc][FOLD] * reachprobs[root.player][hc] for hc in reachprobs[root.player] }
             action_payoffs[FOLD] = self.cfr_helper(root.fold_action, next_reachprobs)
         if root.call_action:
-            next_reachprobs[root.player] = { hc: action_probs[hc][CALL] * reachprobs[root.player][hc] for hc in root.holecards[root.player] }
+            next_reachprobs[root.player] = { hc: action_probs[hc][CALL] * reachprobs[root.player][hc] for hc in reachprobs[root.player] }
             action_payoffs[CALL] = self.cfr_helper(root.call_action, next_reachprobs)
         if root.raise_action:
-            next_reachprobs[root.player] = { hc: action_probs[hc][RAISE] * reachprobs[root.player][hc] for hc in root.holecards[root.player] }
+            next_reachprobs[root.player] = { hc: action_probs[hc][RAISE] * reachprobs[root.player][hc] for hc in reachprobs[root.player] }
             action_payoffs[RAISE] = self.cfr_helper(root.raise_action, next_reachprobs)
         payoffs = []
         for player in range(self.rules.players):
-            player_payoffs = { hc: 0 for hc in root.holecards[player] }
+            player_payoffs = { hc: 0 for hc in reachprobs[player] }
             for i,subpayoff in enumerate(action_payoffs):
                 if subpayoff is None:
                     continue
@@ -184,8 +184,10 @@ class PublicChanceSamplingCFR(CounterfactualRegretMinimizer):
             if self.boardmatch(num_dealt, bc):
                 # Deal the card(s)
                 self.top_card += num_dealt
-                # Update the probabilities for each HC to be 1/N for N possible boardcard deals
-                next_reachprobs = [{ hc: reachprobs[player][hc] / len(root.children) for hc in bc.holecards[player] } for player in range(self.rules.players)]
+                # Update the probabilities for each HC. Assume chance prob = 1 and renormalize reach probs by new holecard range
+                next_reachprobs = [{ hc: reachprobs[player][hc] for hc in bc.holecards[player] } for player in range(self.rules.players)]
+                sumprobs = [sum(next_reachprobs[player].values()) for player in range(self.rules.players)]
+                next_reachprobs = [{ hc: reachprobs[player][hc] for hc in bc.holecards[player] } for player in range(self.rules.players)]
                 # Perform normal CFR
                 results = self.cfr_helper(bc, next_reachprobs)
                 # Put the cards back in the deck (so we use the same sampled cards for every trajectory)
@@ -228,5 +230,141 @@ class PublicChanceSamplingCFR(CounterfactualRegretMinimizer):
                 self.profile.strategies[root.player].policy[infoset] = [self.action_reachprobs[root.player][infoset][i] / sum(self.action_reachprobs[root.player][infoset]) for i in range(3)]
         # Return and use the current CFR strategy
         return self.current_profile.strategies[root.player]
+
+
+class ChanceSamplingCFR(CounterfactualRegretMinimizer):
+    def __init__(self, rules):
+        CounterfactualRegretMinimizer.__init__(self, rules)
+
+    def cfr(self):
+        # Sample all cards to be used
+        holecards_per_player = sum([x.holecards for x in self.rules.roundinfo])
+        boardcards_per_hand = sum([x.boardcards for x in self.rules.roundinfo])
+        todeal = random.sample(self.rules.deck, boardcards_per_hand + holecards_per_player * self.rules.players)
+        # Deal holecards
+        self.holecards = [tuple(todeal[p*holecards_per_player:(p+1)*holecards_per_player]) for p in range(self.rules.players)]
+        self.board = tuple(todeal[-boardcards_per_hand:])
+        # Set the top card of the deck
+        self.top_card = len(todeal) - boardcards_per_hand
+        # Call the standard CFR algorithm
+        self.cfr_helper(self.tree.root, [1 for _ in range(self.rules.players)])
+
+    def cfr_terminal_node(self, root, reachprobs):
+        payoffs = [0 for _ in range(self.rules.players)]
+        for hands,winnings in root.payoffs.items():
+            if not self.terminal_match(hands):
+                continue
+            for player in range(self.rules.players):
+                prob = 1.0
+                for opp,hc in enumerate(hands):
+                    if opp != player:
+                        prob *= reachprobs[opp]
+                payoffs[player] = prob * winnings[player]
+            return payoffs
+
+    def terminal_match(self, hands):
+        for p in range(self.rules.players):
+            if not self.hcmatch(hands[p], p):
+                return False
+        return True
+
+    def hcmatch(self, hc, player):
+        # Checks if this hand is isomorphic to the sampled hand
+        sampled = self.holecards[player][:len(hc)]
+        for c in hc:
+            if c not in sampled:
+                return False
+        return True
+
+    def cfr_holecard_node(self, root, reachprobs):
+        assert(len(root.children) == 1)
+        return self.cfr_helper(root.children[0], reachprobs)
+    
+    def cfr_boardcard_node(self, root, reachprobs):
+        # Number of community cards dealt this round
+        num_dealt = len(root.children[0].board) - len(root.board)
+        # Find the child that matches the sampled board card(s)
+        for bc in root.children:
+            if self.boardmatch(num_dealt, bc):
+                # Perform normal CFR
+                results = self.cfr_helper(bc, reachprobs)
+                # Return the payoffs
+                return results
+        raise Exception('Sampling from impossible board card')
+
+    def boardmatch(self, num_dealt, node):
+        # Checks if this node is a match for the sampled board card(s)
+        for next_card in range(0, len(node.board)):
+            if self.board[next_card] not in node.board:
+                return False
+        return True
+
+    def cfr_action_node(self, root, reachprobs):
+        # Calculate strategy from counterfactual regret
+        strategy = self.cfr_strategy_update(root, reachprobs)
+        next_reachprobs = deepcopy(reachprobs)
+        hc = self.holecards[root.player][0:len(root.holecards[root.player])]
+        action_probs = strategy.probs(self.rules.infoset_format(root.player, hc, root.board, root.bet_history))
+        action_payoffs = [None, None, None]
+        if root.fold_action:
+            next_reachprobs[root.player] = action_probs[FOLD] * reachprobs[root.player]
+            action_payoffs[FOLD] = self.cfr_helper(root.fold_action, next_reachprobs)
+        if root.call_action:
+            next_reachprobs[root.player] = action_probs[CALL] * reachprobs[root.player]
+            action_payoffs[CALL] = self.cfr_helper(root.call_action, next_reachprobs)
+        if root.raise_action:
+            next_reachprobs[root.player] = action_probs[RAISE] * reachprobs[root.player]
+            action_payoffs[RAISE] = self.cfr_helper(root.raise_action, next_reachprobs)
+        payoffs = [0 for player in range(self.rules.players)]
+        for i,subpayoff in enumerate(action_payoffs):
+            if subpayoff is None:
+                continue
+            for player,winnings in enumerate(subpayoff):
+                # action_probs is baked into reachprobs for everyone except the acting player
+                if player == root.player:
+                    payoffs[player] += winnings * action_probs[i]
+                else:
+                    payoffs[player] += winnings
+        # Update regret calculations
+        self.cfr_regret_update(root, action_payoffs, payoffs[root.player])
+        return payoffs
+
+    def cfr_strategy_update(self, root, reachprobs):
+        # Update the strategies and regrets for each infoset
+        hc = self.holecards[root.player][0:len(root.holecards[root.player])]
+        infoset = self.rules.infoset_format(root.player, hc, root.board, root.bet_history)
+        # Get the current CFR
+        prev_cfr = self.counterfactual_regret[root.player][infoset]
+        # Get the total positive CFR
+        sumpos_cfr = float(sum([max(0,x) for x in prev_cfr]))
+        if sumpos_cfr == 0:
+            # Default strategy is equal probability
+            probs = self.equal_probs(root)
+        else:
+            # Use the strategy that's proportional to accumulated positive CFR
+            probs = [max(0,x) / sumpos_cfr for x in prev_cfr]
+        # Use the updated strategy as our current strategy
+        self.current_profile.strategies[root.player].policy[infoset] = probs
+        # Update the weighted policy probabilities (used to recover the average strategy)
+        for i in range(3):
+            self.action_reachprobs[root.player][infoset][i] += reachprobs[root.player] * probs[i]
+        if sum(self.action_reachprobs[root.player][infoset]) == 0:
+            # Default strategy is equal weight
+            self.profile.strategies[root.player].policy[infoset] = self.equal_probs(root)
+        else:
+            # Recover the weighted average strategy
+            self.profile.strategies[root.player].policy[infoset] = [self.action_reachprobs[root.player][infoset][i] / sum(self.action_reachprobs[root.player][infoset]) for i in range(3)]
+        # Return and use the current CFR strategy
+        return self.current_profile.strategies[root.player]
+
+    def cfr_regret_update(self, root, action_payoffs, ev):
+        hc = self.holecards[root.player][0:len(root.holecards[root.player])]
+        for i,subpayoff in enumerate(action_payoffs):
+            if subpayoff is None:
+                continue
+            immediate_cfr = subpayoff[root.player] - ev
+            infoset = self.rules.infoset_format(root.player, hc, root.board, root.bet_history)
+            prev_cfr = self.counterfactual_regret[root.player][infoset][i]
+            self.counterfactual_regret[root.player][infoset][i] += immediate_cfr
 
 
