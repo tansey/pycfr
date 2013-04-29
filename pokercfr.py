@@ -168,44 +168,85 @@ class PublicChanceSamplingCFR(CounterfactualRegretMinimizer):
     def cfr(self):
         # Sample all board cards to be used
         self.board = random.sample(self.rules.deck, sum([x.boardcards for x in self.rules.roundinfo]))
-        # Set the top card of the deck
-        self.top_card = 0
         # Call the standard CFR algorithm
         self.cfr_helper(self.tree.root, [{(): 1} for _ in range(self.rules.players)])
+
+    def cfr_terminal_node(self, root, reachprobs):
+        payoffs = [None for _ in range(self.rules.players)]
+        for player in range(self.rules.players):
+            player_payoffs = {hc: 0 for hc in reachprobs[player]}
+            counts = {hc: 0 for hc in reachprobs[player]}
+            for hands,winnings in root.payoffs.items():
+                if not self.terminal_match(hands):
+                    continue
+                prob = 1.0
+                player_hc = None
+                for opp,hc in enumerate(hands):
+                    if opp == player:
+                        player_hc = hc
+                    else:
+                        prob *= reachprobs[opp][hc]
+                player_payoffs[player_hc] += prob * winnings[player]
+                counts[player_hc] += 1
+            for hc,count in counts.items():
+                if count > 0:
+                    player_payoffs[hc] /= float(count)
+            payoffs[player] = player_payoffs
+        return payoffs
+
+    def terminal_match(self, hands):
+        for hc in hands:
+            if self.has_boardcard(hc):
+                return False
+        return True
+
+    def cfr_holecard_node(self, root, reachprobs):
+        assert(len(root.children) == 1)
+        prevlen = len(reachprobs[0].keys()[0])
+        possible_deals = float(choose(len(root.deck) - len(self.board) - prevlen,root.todeal))
+        next_reachprobs = [{ hc: reachprobs[player][hc[0:prevlen]] / possible_deals for hc in root.children[0].holecards[player] if not self.has_boardcard(hc) } for player in range(self.rules.players)]
+        subpayoffs = self.cfr_helper(root.children[0], next_reachprobs)
+        payoffs = [{ hc: 0 for hc in reachprobs[player] } for player in range(self.rules.players)]
+        for player, subpayoff in enumerate(subpayoffs):
+            for hand,winnings in subpayoff.items():
+                hc = hand[0:prevlen]
+                payoffs[player][hc] += winnings
+        return payoffs
+
+    def has_boardcard(self, hc):
+        for c in hc:
+            if c in self.board:
+                return True
+        return False
 
     def cfr_boardcard_node(self, root, reachprobs):
         # Number of community cards dealt this round
         num_dealt = len(root.children[0].board) - len(root.board)
-        # Possible combinations of community cards
-        prevlen = len(reachprobs[0].keys()[0])
-        possible_deals = float(choose(len(root.deck) - prevlen,root.todeal))
         # Find the child that matches the sampled board card(s)
         for bc in root.children:
             if self.boardmatch(num_dealt, bc):
-                # Deal the card(s)
-                self.top_card += num_dealt
                 # Update the probabilities for each HC. Assume chance prob = 1 and renormalize reach probs by new holecard range
-                next_reachprobs = [{ hc: reachprobs[player][hc] for hc in bc.holecards[player] } for player in range(self.rules.players)]
-                sumprobs = [sum(next_reachprobs[player].values()) for player in range(self.rules.players)]
-                next_reachprobs = [{ hc: reachprobs[player][hc] for hc in bc.holecards[player] } for player in range(self.rules.players)]
+                #next_reachprobs = [{ hc: reachprobs[player][hc] for hc in reachprobs[player] } for player in range(self.rules.players)]
+                #sumprobs = [sum(next_reachprobs[player].values()) for player in range(self.rules.players)]
+                #if min(sumprobs) == 0:
+                #    return [{ hc: 0 for hc in reachprobs[player] } for player in range(self.rules.players)]
+                #next_reachprobs = [{ hc: reachprobs[player][hc] / sumprobs[player] for hc in bc.holecards[player] } for player in range(self.rules.players)]
                 # Perform normal CFR
-                results = self.cfr_helper(bc, next_reachprobs)
-                # Put the cards back in the deck (so we use the same sampled cards for every trajectory)
-                self.top_card -= num_dealt
+                results = self.cfr_helper(bc, reachprobs)
                 # Return the payoffs
                 return results
         raise Exception('Sampling from impossible board card')
 
     def boardmatch(self, num_dealt, node):
         # Checks if this node is a match for the sampled board card(s)
-        for next_card in range(self.top_card, self.top_card + num_dealt):
+        for next_card in range(0, len(node.board)):
             if self.board[next_card] not in node.board:
                 return False
         return True
 
     def cfr_strategy_update(self, root, reachprobs):
         # Update the strategies and regrets for each infoset
-        for hc in root.holecards[root.player]:
+        for hc in reachprobs[root.player]:
             infoset = self.rules.infoset_format(root.player, hc, root.board, root.bet_history)
             # Get the current CFR
             prev_cfr = self.counterfactual_regret[root.player][infoset]
