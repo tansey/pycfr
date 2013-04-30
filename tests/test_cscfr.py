@@ -14,7 +14,7 @@ print 'Testing Chance Sampling (CS) CFR'
 print ''
 print ''
 
-print 'Computer NE for Half-Street Kuhn poker'
+print 'Computing NE for Half-Street Kuhn poker'
 
 hskuhn = half_street_kuhn_rules()
 cfr = ChanceSamplingCFR(hskuhn)

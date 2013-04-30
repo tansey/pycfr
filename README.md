@@ -1,7 +1,7 @@
 pyCFR
 =====
 
-A python implementation of Counterfactual Regret Minimization (CFR) [1] for flop-style poker games like Texas Hold'em, Leduc, and Kuhn poker. The library currently implements both vanilla CFR, Chance Sampling (CS) CFR, and Public Chance Sampling (PCS) CFR [2].
+A python implementation of Counterfactual Regret Minimization (CFR) [1] for flop-style poker games like Texas Hold'em, Leduc, and Kuhn poker. The library currently implements both vanilla CFR [1], Chance Sampling (CS) CFR [1,2], Outcome Sampling (CS) CFR [2], and Public Chance Sampling (PCS) CFR [3].
 
 Note that this library is intended to automatically support relatively small games. It is written in pure python and is not optimized for speed nor memory usage. Full-scale Texas Hold'em will likely be too slow and too big to handle. You should use this library if you want to learn about CFR, you are doing research on toy problems, or you want to sanity check your implementation on a poker variant where no optimized code is publicly available.
 
@@ -84,7 +84,7 @@ best_response = brev[0]
 expected_values = brev[1]
 ```
 
-The underlying implementation of the best response calculation uses a generalized version of the public tree algorithm presented in [3].
+The underlying implementation of the best response calculation uses a generalized version of the public tree algorithm presented in [4].
 
 Finding a Nash equilibrium
 --------------------------
@@ -99,12 +99,13 @@ cfr = CounterfactualRegretMinimizer(hskuhn)
 
 # Run a number of iterations, determining the exploitability of the agents periodically
 iterations_per_block = 1000
-blocks = 50
+blocks = 10
 for block in range(blocks):
     print 'Iterations: {0}'.format(block * iterations_per_block)
     cfr.run(iterations_per_block)
     result = cfr.profile.best_response()
     print 'Best response EV: {0}'.format(result[1])
+    print 'Total exploitability: {0}'.format(sum(result[1]))
 
 # The final result is a strategy profile of epsilon-optimal agents
 nash_strategies = cfr.profile
@@ -112,7 +113,7 @@ nash_strategies = cfr.profile
 
 Tests
 -----
-Tests for the game tree code are implemented in the `tests` directory.
+Tests for the game tree code are implemented in the `tests` directory. WARNING: Tests using Leduc poker are slow due to the size of the game.
 
 - test_gametree.py - Tests the game tree functionality against a leduc-like game and verifies some branches are built as expected.
 
@@ -120,9 +121,11 @@ Tests for the game tree code are implemented in the `tests` directory.
 
 - test_cfr.py - Tests the CFR minimizer functionality by running it on half-street Kuhn poker and Leduc poker. WARNING: Leduc poker is slow due to the size of the game.
 
-- test_cscfr.py - Tests the Chance Sampling (CS) CFR minimizer functionality by running it on half-street Kuhn poker and Leduc poker. WARNING: Leduc poker is slow due to the size of the game.
+- test_cscfr.py - Tests the Chance Sampling (CS) CFR minimizer functionality by running it on half-street Kuhn poker and Leduc poker. 
 
-- test_pcscfr.py - Tests the Public Chance Sampling (PCS) CFR minimizer functionality by running it on half-street Kuhn poker and Leduc poker. WARNING: Leduc poker is slow due to the size of the game.
+- test_oscfr.py - Tests the Outcome Sampling (OS) CFR minimizer functionality by running it on half-street Kuhn poker and Leduc poker.
+
+- test_pcscfr.py - Tests the Public Chance Sampling (PCS) CFR minimizer functionality by running it on half-street Kuhn poker and Leduc poker.
 
 Note the tests are intended to be run from the main directory, e.g. `python test/test_gametree.py`. They make some assumptions about relative paths when importing modules and loading and saving files.
 
@@ -130,9 +133,9 @@ TODO
 ----
 The following is a list of items that still need to be implemented:
 
-- Outcome Sampling CFR (OS-CFR)
-- Average Strategy CFR (AS-CFR)
-- Handle edge cases where holecards come after the first round when there may be a variable number of players. It may work, but it's untested on any of the implemented CFR variants.
+- Add no-limit poker games
+- Average Strategy CFR (AS-CFR) for no-limit games
+- Add test cases for games where additional holecards come after the first round when there may be a variable number of players. It may currently work, but it's untested on any of the implemented CFR variants.
 
 
 Contributors
@@ -149,6 +152,8 @@ References
 ----------
 [1] Zinkevich, M., Johanson, M., Bowling, M., & Piccione, C. (2008). Regret minimization in games with incomplete information. Advances in neural information processing systems, 20, 1729-1736.
 
-[2] Johanson, M., Bard, N., Lanctot, M., Gibson, R., & Bowling, M. (2012, June). Efficient Nash equilibrium approximation through Monte Carlo counterfactual regret minimization. In Proceedings of the 11th International Conference on Autonomous Agents and Multiagent Systems-Volume 2 (pp. 837-846). International Foundation for Autonomous Agents and Multiagent Systems.
+[2] Lanctot, M., Waugh, K., Zinkevich, M., & Bowling, M. (2009). Monte Carlo sampling for regret minimization in extensive games. Advances in Neural Information Processing Systems, 22, 1078-1086.
 
-[3] Johanson, M., Waugh, K., Bowling, M., & Zinkevich, M. (2011, July). Accelerating best response calculation in large extensive games. In Proceedings of the Twenty-Second international joint conference on Artificial Intelligence-Volume Volume One (pp. 258-265). AAAI Press.
+[3] Johanson, M., Bard, N., Lanctot, M., Gibson, R., & Bowling, M. (2012, June). Efficient Nash equilibrium approximation through Monte Carlo counterfactual regret minimization. In Proceedings of the 11th International Conference on Autonomous Agents and Multiagent Systems-Volume 2 (pp. 837-846). International Foundation for Autonomous Agents and Multiagent Systems.
+
+[4] Johanson, M., Waugh, K., Bowling, M., & Zinkevich, M. (2011, July). Accelerating best response calculation in large extensive games. In Proceedings of the Twenty-Second international joint conference on Artificial Intelligence-Volume Volume One (pp. 258-265). AAAI Press.

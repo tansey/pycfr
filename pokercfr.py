@@ -145,8 +145,6 @@ class CounterfactualRegretMinimizer(object):
             for hc,winnings in subpayoff[root.player].iteritems():
                 immediate_cfr = winnings - ev[hc]
                 infoset = self.rules.infoset_format(root.player, hc, root.board, root.bet_history)
-                prev_cfr = self.counterfactual_regret[root.player][infoset][i]
-                #self.counterfactual_regret[root.player][infoset][i] = 1.0 / (self.iterations + 1) * (self.iterations * prev_cfr + immediate_cfr)
                 self.counterfactual_regret[root.player][infoset][i] += immediate_cfr
 
     def equal_probs(self, root):
@@ -405,7 +403,127 @@ class ChanceSamplingCFR(CounterfactualRegretMinimizer):
                 continue
             immediate_cfr = subpayoff[root.player] - ev
             infoset = self.rules.infoset_format(root.player, hc, root.board, root.bet_history)
-            prev_cfr = self.counterfactual_regret[root.player][infoset][i]
             self.counterfactual_regret[root.player][infoset][i] += immediate_cfr
 
+class OutcomeSamplingCFR(ChanceSamplingCFR):
+    def __init__(self, rules, exploration=0.4):
+        ChanceSamplingCFR.__init__(self, rules)
+        self.exploration = exploration
 
+    def cfr(self):
+        # Sample all cards to be used
+        holecards_per_player = sum([x.holecards for x in self.rules.roundinfo])
+        boardcards_per_hand = sum([x.boardcards for x in self.rules.roundinfo])
+        todeal = random.sample(self.rules.deck, boardcards_per_hand + holecards_per_player * self.rules.players)
+        # Deal holecards
+        self.holecards = [tuple(todeal[p*holecards_per_player:(p+1)*holecards_per_player]) for p in range(self.rules.players)]
+        self.board = tuple(todeal[-boardcards_per_hand:])
+        # Set the top card of the deck
+        self.top_card = len(todeal) - boardcards_per_hand
+        # Call the standard CFR algorithm
+        self.cfr_helper(self.tree.root, [1 for _ in range(self.rules.players)], 1.0)
+
+    def cfr_helper(self, root, reachprobs, sampleprobs):
+        if type(root) is TerminalNode:
+            return self.cfr_terminal_node(root, reachprobs, sampleprobs)
+        if type(root) is HolecardChanceNode:
+            return self.cfr_holecard_node(root, reachprobs, sampleprobs)
+        if type(root) is BoardcardChanceNode:
+            return self.cfr_boardcard_node(root, reachprobs, sampleprobs)
+        return self.cfr_action_node(root, reachprobs, sampleprobs)
+
+    def cfr_terminal_node(self, root, reachprobs, sampleprobs):
+        payoffs = [0 for _ in range(self.rules.players)]
+        for hands,winnings in root.payoffs.items():
+            if not self.terminal_match(hands):
+                continue
+            for player in range(self.rules.players):
+                prob = 1.0
+                for opp,hc in enumerate(hands):
+                    if opp != player:
+                        prob *= reachprobs[opp]
+                payoffs[player] = prob * winnings[player] / sampleprobs
+            return payoffs
+
+    def cfr_holecard_node(self, root, reachprobs, sampleprobs):
+        assert(len(root.children) == 1)
+        return self.cfr_helper(root.children[0], reachprobs, sampleprobs)
+    
+    def cfr_boardcard_node(self, root, reachprobs, sampleprobs):
+        # Number of community cards dealt this round
+        num_dealt = len(root.children[0].board) - len(root.board)
+        # Find the child that matches the sampled board card(s)
+        for bc in root.children:
+            if self.boardmatch(num_dealt, bc):
+                # Perform normal CFR
+                results = self.cfr_helper(bc, reachprobs, sampleprobs)
+                # Return the payoffs
+                return results
+        raise Exception('Sampling from impossible board card')
+
+    def cfr_action_node(self, root, reachprobs, sampleprobs):
+        # Calculate strategy from counterfactual regret
+        strategy = self.cfr_strategy_update(root, reachprobs, sampleprobs)
+        hc = self.holecards[root.player][0:len(root.holecards[root.player])]
+        infoset = self.rules.infoset_format(root.player, hc, root.board, root.bet_history)
+        action_probs = strategy.probs(infoset)
+        if random.random() < self.exploration:
+            action = self.random_action(root)
+        else:
+            action = strategy.sample_action(infoset)
+        reachprobs[root.player] *= action_probs[action]
+        csp = self.exploration * (1.0 / len(root.children)) + (1.0 - self.exploration) * action_probs[action]
+        payoffs = self.cfr_helper(root.get_child(action), reachprobs, sampleprobs * csp)
+        # Update regret calculations
+        self.cfr_regret_update(root, payoffs[root.player], action, action_probs[action])
+        payoffs[root.player] *= action_probs[action]
+        return payoffs
+
+    def random_action(self, root):
+        options = []
+        if root.fold_action:
+            options.append(FOLD)
+        if root.call_action:
+            options.append(CALL)
+        if root.raise_action:
+            options.append(RAISE)
+        return random.choice(options)
+
+    def cfr_strategy_update(self, root, reachprobs, sampleprobs):
+        # Update the strategies and regrets for each infoset
+        hc = self.holecards[root.player][0:len(root.holecards[root.player])]
+        infoset = self.rules.infoset_format(root.player, hc, root.board, root.bet_history)
+        # Get the current CFR
+        prev_cfr = self.counterfactual_regret[root.player][infoset]
+        # Get the total positive CFR
+        sumpos_cfr = float(sum([max(0,x) for x in prev_cfr]))
+        if sumpos_cfr == 0:
+            # Default strategy is equal probability
+            probs = self.equal_probs(root)
+        else:
+            # Use the strategy that's proportional to accumulated positive CFR
+            probs = [max(0,x) / sumpos_cfr for x in prev_cfr]
+        # Use the updated strategy as our current strategy
+        self.current_profile.strategies[root.player].policy[infoset] = probs
+        # Update the weighted policy probabilities (used to recover the average strategy)
+        for i in range(3):
+            self.action_reachprobs[root.player][infoset][i] += reachprobs[root.player] * probs[i] / sampleprobs
+        if sum(self.action_reachprobs[root.player][infoset]) == 0:
+            # Default strategy is equal weight
+            self.profile.strategies[root.player].policy[infoset] = self.equal_probs(root)
+        else:
+            # Recover the weighted average strategy
+            self.profile.strategies[root.player].policy[infoset] = [self.action_reachprobs[root.player][infoset][i] / sum(self.action_reachprobs[root.player][infoset]) for i in range(3)]
+        # Return and use the current CFR strategy
+        return self.current_profile.strategies[root.player]
+
+    def cfr_regret_update(self, root, ev, action, actionprob):
+        hc = self.holecards[root.player][0:len(root.holecards[root.player])]
+        infoset = self.rules.infoset_format(root.player, hc, root.board, root.bet_history)
+        for i in range(3):
+            if not root.valid(i):
+                continue
+            immediate_cfr = -ev * actionprob
+            if action == i:
+                immediate_cfr += ev
+            self.counterfactual_regret[root.player][infoset][i] += immediate_cfr

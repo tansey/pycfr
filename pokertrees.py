@@ -391,3 +391,6 @@ class ActionNode(Node):
         if action == RAISE:
             return self.raise_action
         raise Exception("Unknown action {0}. Action must be FOLD, CALL, or RAISE".format(action))
+
+    def get_child(self, action):
+        return self.valid(action)
