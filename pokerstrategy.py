@@ -32,6 +32,19 @@ class Strategy(object):
                         probs[action] = prob
                 self.policy[node.player_view] = probs
 
+    def build_random(self, gametree):
+        for key in gametree.information_sets:
+            node = gametree.information_sets[key][0]
+            if node.player == self.player:
+                probs = [0 for _ in range(3)]
+                total = 0
+                for action in range(3):
+                    if node.valid(action):
+                        probs[action] = random.random()
+                        total += probs[action]
+                probs = [x / total for x in probs]
+                self.policy[node.player_view] = probs
+
     def probs(self, infoset):
         assert(infoset in self.policy)
         return self.policy[infoset]
