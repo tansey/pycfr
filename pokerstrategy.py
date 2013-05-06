@@ -17,9 +17,11 @@ def choose(n, k):
         return 0
 
 class Strategy(object):
-    def __init__(self, player):
+    def __init__(self, player, filename=None):
         self.player = player
         self.policy = {}
+        if filename is not None:
+            self.load_from_file(filename)
 
     def build_default(self, gametree):
         for key in gametree.information_sets:

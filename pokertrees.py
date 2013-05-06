@@ -226,7 +226,7 @@ class GameTree(object):
         payoffs = [-x for x in committed]
         for w in winners:
             payoffs[w] += payoff
-        return TerminalNode(root, committed, holes, board, deck, bet_history, payoffs)
+        return TerminalNode(root, committed, holes, board, deck, bet_history, payoffs, players_in)
 
     def holecard_distributions(self):
         x = Counter(combinations(self.rules.deck, self.holecards))
@@ -315,7 +315,7 @@ class PublicTree(GameTree):
                         if not (hc in scores):
                             scores[hc] = self.rules.handeval(hc, board)
             payoffs = { hands: self.calc_payoffs(hands, scores, players_in, committed, pot) for hands in showdowns_possible }
-        return TerminalNode(root, committed, holes, board, deck, bet_history, payoffs)
+        return TerminalNode(root, committed, holes, board, deck, bet_history, payoffs, players_in)
 
     def showdown_combinations(self, holes):
         # Get all the possible holecard matchups for a given showdown.
@@ -357,9 +357,10 @@ class Node(object):
             self.children.append(child)
 
 class TerminalNode(Node):
-    def __init__(self, parent, committed, holecards, board, deck, bet_history, payoffs):
+    def __init__(self, parent, committed, holecards, board, deck, bet_history, payoffs, players_in):
         Node.__init__(self, parent, committed, holecards, board, deck, bet_history)
         self.payoffs = payoffs
+        self.players_in = players_in
 
 class HolecardChanceNode(Node):
     def __init__(self, parent, committed, holecards, board, deck, bet_history, todeal):
