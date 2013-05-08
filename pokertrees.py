@@ -360,7 +360,7 @@ class TerminalNode(Node):
     def __init__(self, parent, committed, holecards, board, deck, bet_history, payoffs, players_in):
         Node.__init__(self, parent, committed, holecards, board, deck, bet_history)
         self.payoffs = payoffs
-        self.players_in = players_in
+        self.players_in = deepcopy(players_in)
 
 class HolecardChanceNode(Node):
     def __init__(self, parent, committed, holecards, board, deck, bet_history, todeal):
