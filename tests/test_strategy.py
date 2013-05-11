@@ -35,6 +35,7 @@ s1.build_default(no_action_gametree)
 profile = StrategyProfile(no_action_rules, [s0,s1])
 expected_value = profile.expected_value()
 #print 'Expected values: [{0:.9f},{1:.9f}]'.format(expected_value[0], expected_value[1])
+print 'Expected values: [{0},{1}]'.format(expected_value[0], expected_value[1])
 assert(expected_value >= (-0.0001,-0.0001) and expected_value <= (0.0001,0.0001))
 best_responses = profile.best_response()
 br = best_responses[0]
@@ -105,7 +106,8 @@ print ""
 #sys.exit(0)
 
 leduc_rules = leduc_rules()
-leduc_gt = leduc_gametree()
+leduc_gt = PublicTree(leduc_rules)
+leduc_gt.build()
 
 s0 = Strategy(0)
 s0.load_from_file('strategies/leduc/0.strat')

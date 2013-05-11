@@ -10,15 +10,13 @@ class CounterfactualRegretMinimizer(object):
         self.iterations = 0
         self.counterfactual_regret = []
         self.action_reachprobs = []
-        # Note: building the game tree is a convenience. It's not strictly necessary for the algorithm.
-        gametree = GameTree(rules)
-        gametree.build()
-        for s in self.profile.strategies:
-            s.build_default(gametree)
-            self.counterfactual_regret.append({ infoset: [0,0,0] for infoset in s.policy })
-            self.action_reachprobs.append({ infoset: [0,0,0] for infoset in s.policy })
         self.tree = PublicTree(rules)
         self.tree.build()
+        print 'Information sets: {0}'.format(len(self.tree.information_sets))
+        for s in self.profile.strategies:
+            s.build_default(self.tree)
+            self.counterfactual_regret.append({ infoset: [0,0,0] for infoset in s.policy })
+            self.action_reachprobs.append({ infoset: [0,0,0] for infoset in s.policy })
 
     def run(self, num_iterations):
         for iteration in range(num_iterations):
