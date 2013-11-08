@@ -1,7 +1,7 @@
 pyCFR
 =====
 
-A python implementation of Counterfactual Regret Minimization (CFR) [1] for flop-style poker games like Texas Hold'em, Leduc, and Kuhn poker. The library currently implements both vanilla CFR [1], Chance Sampling (CS) CFR [1,2], Outcome Sampling (CS) CFR [2], and Public Chance Sampling (PCS) CFR [3].
+A python implementation of Counterfactual Regret Minimization (CFR) [1] for flop-style poker games like Texas Hold'em, Leduc, and Kuhn poker. The library currently implements vanilla CFR [1], Chance Sampling (CS) CFR [1,2], Outcome Sampling (CS) CFR [2], and Public Chance Sampling (PCS) CFR [3].
 
 Note that this library is intended to automatically support relatively small games. It is written in pure python and is not optimized for speed nor memory usage. Full-scale Texas Hold'em will likely be too slow and too big to handle. You should use this library if you want to learn about CFR, you are doing research on toy problems, or you want to sanity check your implementation on a poker variant where no optimized code is publicly available.
 
@@ -154,6 +154,6 @@ References
 
 [2] Lanctot, M., Waugh, K., Zinkevich, M., & Bowling, M. (2009). Monte Carlo sampling for regret minimization in extensive games. Advances in Neural Information Processing Systems, 22, 1078-1086.
 
-[3] Johanson, M., Bard, N., Lanctot, M., Gibson, R., & Bowling, M. (2012, June). Efficient Nash equilibrium approximation through Monte Carlo counterfactual regret minimization. In Proceedings of the 11th International Conference on Autonomous Agents and Multiagent Systems-Volume 2 (pp. 837-846). International Foundation for Autonomous Agents and Multiagent Systems.
+[3] Johanson, M., Bard, N., Lanctot, M., Gibson, R., & Bowling, M. (2012). Efficient Nash equilibrium approximation through Monte Carlo counterfactual regret minimization. In Proceedings of the 11th International Conference on Autonomous Agents and Multiagent Systems-Volume 2 (pp. 837-846). International Foundation for Autonomous Agents and Multiagent Systems.
 
-[4] Johanson, M., Waugh, K., Bowling, M., & Zinkevich, M. (2011, July). Accelerating best response calculation in large extensive games. In Proceedings of the Twenty-Second international joint conference on Artificial Intelligence-Volume Volume One (pp. 258-265). AAAI Press.
+[4] Johanson, M., Waugh, K., Bowling, M., & Zinkevich, M. (2011). Accelerating best response calculation in large extensive games. In Proceedings of the Twenty-Second international joint conference on Artificial Intelligence-Volume Volume One (pp. 258-265). AAAI Press.
