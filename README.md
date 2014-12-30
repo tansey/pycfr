@@ -95,6 +95,7 @@ Given the rules for a game, you can run the Counterfactual Regret (CFR) Minimiza
 hskuhn = half_street_kuhn_rules()
 
 # Create the CFR minimizer
+from  pokercfr import CounterfactualRegretMinimizer
 cfr = CounterfactualRegretMinimizer(hskuhn)
 
 # Run a number of iterations, determining the exploitability of the agents periodically
