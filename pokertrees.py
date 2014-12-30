@@ -2,7 +2,6 @@ from itertools import combinations
 from itertools import permutations
 from itertools import product
 from collections import Counter
-from card import Card
 from hand_evaluator import HandEvaluator
 from copy import deepcopy
 from functools import partial
